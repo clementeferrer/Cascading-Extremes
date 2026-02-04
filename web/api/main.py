@@ -37,6 +37,11 @@ except ModuleNotFoundError:
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
 
+def _dist_dir() -> Path:
+    static_env = os.getenv("IMMERSIVE_STATIC")
+    return Path(static_env) if static_env else ROOT_DIR / "web" / "immersive" / "dist"
+
+
 
 app = FastAPI(title="Cascading Extremes Immersive API")
 
@@ -225,13 +230,33 @@ def generate(req: GenerateRequest):
 
 
 def _maybe_mount_static() -> None:
-    static_env = os.getenv("IMMERSIVE_STATIC")
-    if static_env:
-        static_path = Path(static_env)
-    else:
-        static_path = ROOT_DIR / "web" / "immersive" / "dist"
-    if static_path.exists():
-        app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
+    dist_dir = _dist_dir()
+    assets_dir = dist_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
 
 _maybe_mount_static()
+
+
+@app.get("/", include_in_schema=False)
+def spa_root():
+    dist_dir = _dist_dir()
+    index_path = dist_dir / "index.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="Frontend not built")
+    return FileResponse(index_path)
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def spa_fallback(full_path: str):
+    if full_path.startswith(("api", "runs", "docs", "redoc", "openapi.json", "assets")):
+        raise HTTPException(status_code=404)
+    dist_dir = _dist_dir()
+    candidate = dist_dir / full_path
+    if candidate.is_file():
+        return FileResponse(candidate)
+    index_path = dist_dir / "index.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="Frontend not built")
+    return FileResponse(index_path)
