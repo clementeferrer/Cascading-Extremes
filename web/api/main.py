@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -34,7 +35,21 @@ except ModuleNotFoundError:
     HAS_CASCADES = False
 
 
+logger = logging.getLogger("cascade")
+logging.basicConfig(level=logging.INFO)
+
 ROOT_DIR = Path(__file__).resolve().parents[2]
+ARTIFACTS_DIR = ROOT_DIR / "artifacts"
+CONFIGS_DIR = ROOT_DIR / "configs"
+RUNS_DIR = ARTIFACTS_DIR / "runs"
+RUNS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _resolve_config_path(config_path: str) -> Path:
+    cfg_path = Path(config_path)
+    if not cfg_path.is_absolute():
+        cfg_path = ROOT_DIR / cfg_path
+    return cfg_path
 
 
 def _dist_dir() -> Path:
@@ -183,16 +198,21 @@ def generate_continue(req: GenerateRequest):
         "R": R[start : trigger_idx + 1],
     }
 
-    model_path = Path("artifacts") / "model.pt"
-    q_path = Path("artifacts") / "quantile_model.pt"
+    model_path = ARTIFACTS_DIR / "model.pt"
+    q_path = ARTIFACTS_DIR / "quantile_model.pt"
     max_time = req.max_time if req.max_time is not None else 240.0
 
     trim_start = 0
     if model_path.exists() and q_path.exists():
-        cfg = load_config(req.config)
+        cfg_path = _resolve_config_path(req.config)
+        cfg = load_config(str(cfg_path))
         model = load_model(str(model_path))
+        model.to("cpu")
+        model.eval()
         q_cfg = QuantileModelConfig(**cfg["extremes"]["quantile_model"])
         q_model = load_quantile_model(str(q_path), model.d_assets, q_cfg)
+        q_model.to("cpu")
+        q_model.eval()
         sim = generate_with_limits(seed, req.max_events, max_time, model, q_model)
         trim_start = max(0, len(seed["T"]) - 1)
     else:
@@ -220,13 +240,18 @@ def generate_continue(req: GenerateRequest):
         sim["dT"][0] = np.median(sim["dT"][1:]) if len(sim["dT"]) > 1 else 1.0
 
     run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ_gen")
-    export_run_from_arrays(req.config, run_id, "generative", sim)
+    cfg_path = _resolve_config_path(req.config)
+    export_run_from_arrays(str(cfg_path), run_id, "generative", sim, output_dir=str(RUNS_DIR))
     return {"run_id": run_id}
 
 
 @app.post("/generate")
 def generate(req: GenerateRequest):
-    return generate_continue(req)
+    try:
+        return generate_continue(req)
+    except Exception as exc:
+        logger.exception("POST /generate failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 def _maybe_mount_static() -> None:
