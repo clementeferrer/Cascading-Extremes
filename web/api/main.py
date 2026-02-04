@@ -231,21 +231,7 @@ def _maybe_mount_static() -> None:
     else:
         static_path = ROOT_DIR / "web" / "immersive" / "dist"
     if static_path.exists():
-        assets_path = static_path / "assets"
-        if assets_path.exists():
-            app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
-
-
-@app.get("/{full_path:path}")
-def spa_fallback(full_path: str):
-    if full_path.startswith(("api", "runs", "docs", "openapi.json", "assets")):
-        raise HTTPException(status_code=404, detail="Not Found")
-    static_env = os.getenv("IMMERSIVE_STATIC")
-    static_path = Path(static_env) if static_env else ROOT_DIR / "web" / "immersive" / "dist"
-    index_path = static_path / "index.html"
-    if not index_path.exists():
-        raise HTTPException(status_code=404, detail="Frontend not built")
-    return FileResponse(index_path)
+        app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
 
 
 _maybe_mount_static()
