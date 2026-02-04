@@ -12,6 +12,7 @@ FROM python:3.11-slim AS runtime
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 COPY web/api/requirements.txt /app/web/api/requirements.txt
 RUN pip install --no-cache-dir -r /app/web/api/requirements.txt
