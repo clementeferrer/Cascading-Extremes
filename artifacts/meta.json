@@ -1,0 +1,78 @@
+{
+  "symbols": [
+    "BNB-USD",
+    "BTC-USD",
+    "ETH-USD"
+  ],
+  "tau": 0.98,
+  "config": {
+    "data": {
+      "symbols": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "period": "730d",
+      "interval": "1h",
+      "cache_dir": "data/raw",
+      "price_field": "Close",
+      "timezone": "UTC"
+    },
+    "preprocess": {
+      "garch_dist": "t",
+      "pit_clip": 1e-06
+    },
+    "extremes": {
+      "tau": 0.98,
+      "eps": 1e-08,
+      "quantile_model": {
+        "hidden_sizes": [
+          64,
+          64
+        ],
+        "lr": 0.001,
+        "epochs": 200,
+        "batch_size": 256
+      }
+    },
+    "dataset": {
+      "seq_len": 64,
+      "stride": 1,
+      "split": [
+        0.7,
+        0.15,
+        0.15
+      ]
+    },
+    "model": {
+      "d_model": 128,
+      "nhead": 4,
+      "num_layers": 4,
+      "dropout": 0.1,
+      "dirichlet_components": 4,
+      "hawkes_hidden": 64,
+      "gauge_hidden": 64,
+      "max_len": 256,
+      "a_min": 0.001
+    },
+    "train": {
+      "lr": 0.001,
+      "batch_size": 32,
+      "epochs": 30,
+      "weight_decay": 0.0001,
+      "seed": 42,
+      "device": "cpu"
+    },
+    "simulate": {
+      "horizon_events": 200,
+      "seed_len": 20,
+      "temperature": 1.0
+    },
+    "viz": {
+      "default_checkpoint": "artifacts/model.pt"
+    }
+  },
+  "u_meta": {
+    "tau": 0.9800000190734863
+  }
+}

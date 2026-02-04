@@ -1,0 +1,4 @@
+
+# Never commit dependencies/build outputs
+**/node_modules/
+**/dist/

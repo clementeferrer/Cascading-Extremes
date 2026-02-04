@@ -1,0 +1,17 @@
+torch
+pandas
+numpy
+yfinance
+arch
+scipy
+plotly
+streamlit
+pyyaml
+kaleido
+fastapi
+uvicorn
+pyarrow
+pydantic
+ruff
+black
+pytest

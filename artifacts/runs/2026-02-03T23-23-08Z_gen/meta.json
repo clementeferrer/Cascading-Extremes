@@ -1,0 +1,17 @@
+{
+  "run_id": "2026-02-03T23-23-08Z_gen",
+  "created_at": "2026-02-03T23:23:08.044501+00:00",
+  "source": "generative",
+  "assets": [
+    "BTC-USD",
+    "ETH-USD",
+    "BNB-USD"
+  ],
+  "freq": "1h",
+  "threshold": {
+    "tau": 0.98,
+    "model": "directional_quantile_mlp"
+  },
+  "model_checkpoint": "artifacts/model.pt",
+  "config_hash": "sha256:55e4e466a7202876d5f7bf37b2d77c420965f0c31cf907d26f8a91b60e36cb18"
+}

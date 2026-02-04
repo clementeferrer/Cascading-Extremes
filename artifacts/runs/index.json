@@ -1,0 +1,1335 @@
+{
+  "runs": [
+    {
+      "run_id": "2026-02-03_real",
+      "created_at": "2026-02-03T06:50:41.154540+00:00",
+      "source": "real",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03_real"
+    },
+    {
+      "run_id": "2026-02-03_sim",
+      "created_at": "2026-02-03T06:50:42.272494+00:00",
+      "source": "simulated",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03_sim"
+    },
+    {
+      "run_id": "2026-02-03T09-04-17Z_gen",
+      "created_at": "2026-02-03T09:04:17.946823+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T09-04-17Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-13Z_gen",
+      "created_at": "2026-02-03T22:19:13.751738+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-13Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-14Z_gen",
+      "created_at": "2026-02-03T22:19:14.734520+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-14Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-15Z_gen",
+      "created_at": "2026-02-03T22:19:15.644882+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-15Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-16Z_gen",
+      "created_at": "2026-02-03T22:19:16.211470+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-16Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-19Z_gen",
+      "created_at": "2026-02-03T22:19:19.178794+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-19Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-20Z_gen",
+      "created_at": "2026-02-03T22:19:20.879302+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-20Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-21Z_gen",
+      "created_at": "2026-02-03T22:19:21.983551+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-21Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-22Z_gen",
+      "created_at": "2026-02-03T22:19:22.934631+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-22Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-23Z_gen",
+      "created_at": "2026-02-03T22:19:23.865470+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-23Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-24Z_gen",
+      "created_at": "2026-02-03T22:19:24.868100+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-24Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-25Z_gen",
+      "created_at": "2026-02-03T22:19:25.176564+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-25Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-26Z_gen",
+      "created_at": "2026-02-03T22:19:26.139669+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-26Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-27Z_gen",
+      "created_at": "2026-02-03T22:19:27.952349+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-27Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-28Z_gen",
+      "created_at": "2026-02-03T22:19:28.823761+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-28Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-29Z_gen",
+      "created_at": "2026-02-03T22:19:29.871134+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-29Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-30Z_gen",
+      "created_at": "2026-02-03T22:19:30.841305+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-30Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-43Z_gen",
+      "created_at": "2026-02-03T22:19:43.680639+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-43Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-44Z_gen",
+      "created_at": "2026-02-03T22:19:44.731077+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-44Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-47Z_gen",
+      "created_at": "2026-02-03T22:19:47.165885+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-47Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-19-48Z_gen",
+      "created_at": "2026-02-03T22:19:48.982569+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-19-48Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-32-23Z_gen",
+      "created_at": "2026-02-03T22:32:23.136577+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-32-23Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-32-24Z_gen",
+      "created_at": "2026-02-03T22:32:24.658016+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-32-24Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-32-26Z_gen",
+      "created_at": "2026-02-03T22:32:26.173107+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-32-26Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-32-27Z_gen",
+      "created_at": "2026-02-03T22:32:27.041262+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-32-27Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-32-28Z_gen",
+      "created_at": "2026-02-03T22:32:28.919931+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-32-28Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-32-29Z_gen",
+      "created_at": "2026-02-03T22:32:29.564635+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-32-29Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-33-51Z_gen",
+      "created_at": "2026-02-03T22:33:51.181988+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-33-51Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-33-54Z_gen",
+      "created_at": "2026-02-03T22:33:54.846949+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-33-54Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-33-55Z_gen",
+      "created_at": "2026-02-03T22:33:55.980659+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-33-55Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-33-56Z_gen",
+      "created_at": "2026-02-03T22:33:56.663819+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-33-56Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-33-57Z_gen",
+      "created_at": "2026-02-03T22:33:57.381731+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-33-57Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-33-58Z_gen",
+      "created_at": "2026-02-03T22:33:58.253757+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-33-58Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-34-00Z_gen",
+      "created_at": "2026-02-03T22:34:00.916661+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-34-00Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-34-01Z_gen",
+      "created_at": "2026-02-03T22:34:01.930210+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-34-01Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-34-02Z_gen",
+      "created_at": "2026-02-03T22:34:02.614049+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-34-02Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-34-03Z_gen",
+      "created_at": "2026-02-03T22:34:03.700189+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-34-03Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-34-06Z_gen",
+      "created_at": "2026-02-03T22:34:06.629819+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-34-06Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-34-08Z_gen",
+      "created_at": "2026-02-03T22:34:08.797520+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-34-08Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-34-10Z_gen",
+      "created_at": "2026-02-03T22:34:10.481026+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-34-10Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-34-11Z_gen",
+      "created_at": "2026-02-03T22:34:11.613864+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-34-11Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-34-12Z_gen",
+      "created_at": "2026-02-03T22:34:12.444957+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-34-12Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-34-13Z_gen",
+      "created_at": "2026-02-03T22:34:13.960927+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-34-13Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-42-31Z_gen",
+      "created_at": "2026-02-03T22:42:31.045910+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-42-31Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-42-33Z_gen",
+      "created_at": "2026-02-03T22:42:33.657842+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-42-33Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-42-34Z_gen",
+      "created_at": "2026-02-03T22:42:34.450506+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-42-34Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-42-38Z_gen",
+      "created_at": "2026-02-03T22:42:38.746145+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-42-38Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-42-39Z_gen",
+      "created_at": "2026-02-03T22:42:39.547149+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-42-39Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-42-40Z_gen",
+      "created_at": "2026-02-03T22:42:40.728812+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-42-40Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-42-41Z_gen",
+      "created_at": "2026-02-03T22:42:41.669873+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-42-41Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-53-02Z_gen",
+      "created_at": "2026-02-03T22:53:02.710193+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-53-02Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-53-03Z_gen",
+      "created_at": "2026-02-03T22:53:03.944267+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-53-03Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T22-54-31Z_gen",
+      "created_at": "2026-02-03T22:54:31.883674+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T22-54-31Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-06-34Z_gen",
+      "created_at": "2026-02-03T23:06:34.367231+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-06-34Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-06-35Z_gen",
+      "created_at": "2026-02-03T23:06:35.669722+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-06-35Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-06-36Z_gen",
+      "created_at": "2026-02-03T23:06:36.225507+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-06-36Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-06-37Z_gen",
+      "created_at": "2026-02-03T23:06:37.526789+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-06-37Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-06-41Z_gen",
+      "created_at": "2026-02-03T23:06:41.073634+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-06-41Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-23-00Z_gen",
+      "created_at": "2026-02-03T23:23:00.407814+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-23-00Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-23-07Z_gen",
+      "created_at": "2026-02-03T23:23:07.262533+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-23-07Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-23-08Z_gen",
+      "created_at": "2026-02-03T23:23:08.044501+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-23-08Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-20Z_gen",
+      "created_at": "2026-02-03T23:38:20.475709+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-20Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-21Z_gen",
+      "created_at": "2026-02-03T23:38:21.494609+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-21Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-22Z_gen",
+      "created_at": "2026-02-03T23:38:22.741924+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-22Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-23Z_gen",
+      "created_at": "2026-02-03T23:38:23.279580+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-23Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-24Z_gen",
+      "created_at": "2026-02-03T23:38:24.940057+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-24Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-25Z_gen",
+      "created_at": "2026-02-03T23:38:25.236581+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-25Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-29Z_gen",
+      "created_at": "2026-02-03T23:38:29.791784+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-29Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-41Z_gen",
+      "created_at": "2026-02-03T23:38:41.992292+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-41Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-42Z_gen",
+      "created_at": "2026-02-03T23:38:42.876915+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-42Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-43Z_gen",
+      "created_at": "2026-02-03T23:38:43.977103+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-43Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-44Z_gen",
+      "created_at": "2026-02-03T23:38:44.609852+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-44Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-38-59Z_gen",
+      "created_at": "2026-02-03T23:38:59.257854+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-38-59Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-39-00Z_gen",
+      "created_at": "2026-02-03T23:39:00.915832+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-39-00Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-39-01Z_gen",
+      "created_at": "2026-02-03T23:39:01.896080+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-39-01Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-39-02Z_gen",
+      "created_at": "2026-02-03T23:39:03.052349+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-39-02Z_gen"
+    },
+    {
+      "run_id": "2026-02-03T23-39-03Z_gen",
+      "created_at": "2026-02-03T23:39:03.627037+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03T23-39-03Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-27Z_gen",
+      "created_at": "2026-02-04T00:06:27.596828+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-27Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-29Z_gen",
+      "created_at": "2026-02-04T00:06:29.868884+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-29Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-30Z_gen",
+      "created_at": "2026-02-04T00:06:30.506057+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-30Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-31Z_gen",
+      "created_at": "2026-02-04T00:06:31.495453+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-31Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-32Z_gen",
+      "created_at": "2026-02-04T00:06:32.780711+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-32Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-33Z_gen",
+      "created_at": "2026-02-04T00:06:33.965029+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-33Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-34Z_gen",
+      "created_at": "2026-02-04T00:06:34.415361+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-34Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-36Z_gen",
+      "created_at": "2026-02-04T00:06:36.036451+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-36Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-38Z_gen",
+      "created_at": "2026-02-04T00:06:38.627721+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-38Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-39Z_gen",
+      "created_at": "2026-02-04T00:06:39.883712+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-39Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-44Z_gen",
+      "created_at": "2026-02-04T00:06:44.886807+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-44Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-45Z_gen",
+      "created_at": "2026-02-04T00:06:45.976092+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-45Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-46Z_gen",
+      "created_at": "2026-02-04T00:06:46.824095+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-46Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-47Z_gen",
+      "created_at": "2026-02-04T00:06:47.635153+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-47Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-48Z_gen",
+      "created_at": "2026-02-04T00:06:48.796849+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-48Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-49Z_gen",
+      "created_at": "2026-02-04T00:06:49.990269+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-49Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-50Z_gen",
+      "created_at": "2026-02-04T00:06:50.894690+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-50Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-51Z_gen",
+      "created_at": "2026-02-04T00:06:51.915160+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-51Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-06-52Z_gen",
+      "created_at": "2026-02-04T00:06:52.090712+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-06-52Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-07-03Z_gen",
+      "created_at": "2026-02-04T00:07:03.972947+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-07-03Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T00-40-09Z_gen",
+      "created_at": "2026-02-04T00:40:09.207656+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T00-40-09Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T01-59-13Z_gen",
+      "created_at": "2026-02-04T01:59:13.787060+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T01-59-13Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T01-59-22Z_gen",
+      "created_at": "2026-02-04T01:59:22.553112+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T01-59-22Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T01-59-27Z_gen",
+      "created_at": "2026-02-04T01:59:27.766932+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T01-59-27Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T01-59-41Z_gen",
+      "created_at": "2026-02-04T01:59:41.064044+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T01-59-41Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T01-59-45Z_gen",
+      "created_at": "2026-02-04T01:59:45.612182+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T01-59-45Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T01-59-56Z_gen",
+      "created_at": "2026-02-04T01:59:56.839349+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T01-59-56Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-13Z_gen",
+      "created_at": "2026-02-04T02:00:13.747098+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-13Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-14Z_gen",
+      "created_at": "2026-02-04T02:00:14.886513+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-14Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-15Z_gen",
+      "created_at": "2026-02-04T02:00:15.586057+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-15Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-16Z_gen",
+      "created_at": "2026-02-04T02:00:16.616302+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-16Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-17Z_gen",
+      "created_at": "2026-02-04T02:00:17.578236+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-17Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-18Z_gen",
+      "created_at": "2026-02-04T02:00:18.963851+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-18Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-19Z_gen",
+      "created_at": "2026-02-04T02:00:19.738314+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-19Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-20Z_gen",
+      "created_at": "2026-02-04T02:00:20.771310+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-20Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-27Z_gen",
+      "created_at": "2026-02-04T02:00:27.502606+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-27Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-28Z_gen",
+      "created_at": "2026-02-04T02:00:28.813575+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-28Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-29Z_gen",
+      "created_at": "2026-02-04T02:00:29.742657+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-29Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-30Z_gen",
+      "created_at": "2026-02-04T02:00:30.663797+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-30Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-36Z_gen",
+      "created_at": "2026-02-04T02:00:36.463326+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-36Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-38Z_gen",
+      "created_at": "2026-02-04T02:00:38.330997+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-38Z_gen"
+    },
+    {
+      "run_id": "2026-02-04T02-00-45Z_gen",
+      "created_at": "2026-02-04T02:00:45.848411+00:00",
+      "source": "generative",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-04T02-00-45Z_gen"
+    }
+  ]
+}
