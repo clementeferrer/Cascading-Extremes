@@ -4,7 +4,7 @@ const envUrl = import.meta.env.VITE_API_URL as string | undefined;
 const API_URL =
   envUrl === "relative"
     ? window.location.origin
-    : (envUrl ? envUrl.replace(/\\/$/, "") : "http://localhost:8000");
+    : (envUrl ? envUrl.replace(/\/$/, "") : "http://localhost:8000");
 
 export async function getRuns() {
   const res = await fetch(`${API_URL}/runs`);
