@@ -37,13 +37,6 @@ except ModuleNotFoundError:
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
 
-class SPAStaticFiles(StaticFiles):
-    async def get_response(self, path: str, scope):
-        response = await super().get_response(path, scope)
-        if response.status_code == 404:
-            response = await super().get_response("index.html", scope)
-        return response
-
 
 app = FastAPI(title="Cascading Extremes Immersive API")
 
@@ -238,7 +231,21 @@ def _maybe_mount_static() -> None:
     else:
         static_path = ROOT_DIR / "web" / "immersive" / "dist"
     if static_path.exists():
-        app.mount("/", SPAStaticFiles(directory=static_path, html=True), name="static")
+        assets_path = static_path / "assets"
+        if assets_path.exists():
+            app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+
+
+@app.get("/{full_path:path}")
+def spa_fallback(full_path: str):
+    if full_path.startswith(("api", "runs", "docs", "openapi.json", "assets")):
+        raise HTTPException(status_code=404, detail="Not Found")
+    static_env = os.getenv("IMMERSIVE_STATIC")
+    static_path = Path(static_env) if static_env else ROOT_DIR / "web" / "immersive" / "dist"
+    index_path = static_path / "index.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="Frontend not built")
+    return FileResponse(index_path)
 
 
 _maybe_mount_static()
