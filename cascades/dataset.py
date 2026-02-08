@@ -15,7 +15,12 @@ def compute_radial_angular(X: np.ndarray, eps: float = 1.0e-8) -> Tuple[np.ndarr
 
 
 def zeta(W: np.ndarray, eps: float = 1.0e-8) -> np.ndarray:
-    lw = np.log(W + eps)
+    """Centered log-ratio coordinates, sign-aware for sphere data.
+
+    For W on the full sphere (possibly negative components):
+      sign(W) * log(|W| + eps) - row mean
+    """
+    lw = np.sign(W) * np.log(np.abs(W) + eps)
     return lw - lw.mean(axis=1, keepdims=True)
 
 
