@@ -25,14 +25,21 @@ except ModuleNotFoundError:
     from storage import get_run_path, list_runs, read_events, read_meta, read_metrics  # type: ignore
 
 try:
-    from cascades.simulate import load_model, load_quantile_model, generate_with_limits
-    from cascades.extremes import QuantileModelConfig
     from cascades.utils import load_config
     from cascades.viz_export.export import export_run_from_arrays
 
     HAS_CASCADES = True
 except ModuleNotFoundError:
     HAS_CASCADES = False
+
+# Phase 2 generation (vMF + Ogata thinning on the sphere)
+try:
+    from second_phase.simulate import load_model as load_model_p2, load_quantile_model as load_qmodel_p2, ogata_thinning
+    from second_phase.extremes import QuantileModelConfig as QCfgP2
+
+    HAS_PHASE2 = True
+except ModuleNotFoundError:
+    HAS_PHASE2 = False
 
 
 logger = logging.getLogger("cascade")
@@ -147,6 +154,27 @@ class GenerateRequest(BaseModel):
     seed: Optional[int] = None  # Random seed for reproducibility
 
 
+def _build_seed(events, req, T, W, R, dT):
+    """Extract seed window from events based on request filters."""
+    seed_window = max(4, min(req.seed_window, len(T)))
+    mask = np.ones(len(T), dtype=bool)
+    if req.seed_asset:
+        mask &= np.array([events[i]["asset"] == req.seed_asset for i in range(len(events))], dtype=bool)
+    if req.min_mag is not None:
+        mask &= np.array([events[i]["mag"] >= req.min_mag for i in range(len(events))], dtype=bool)
+    valid_idx = np.where(mask)[0]
+    if len(valid_idx) == 0:
+        valid_idx = np.arange(len(T))
+    trigger_idx = int(valid_idx[-1])
+    start = max(0, trigger_idx - seed_window + 1)
+    return {
+        "T": T[start : trigger_idx + 1],
+        "dT": dT[start : trigger_idx + 1],
+        "W": W[start : trigger_idx + 1],
+        "R": R[start : trigger_idx + 1],
+    }, valid_idx
+
+
 @app.post("/generate/continue")
 def generate_continue(req: GenerateRequest):
     if not HAS_CASCADES:
@@ -158,12 +186,11 @@ def generate_continue(req: GenerateRequest):
     if req.seed is not None:
         random.seed(req.seed)
         np.random.seed(req.seed)
-    runs = list_runs()
+    all_runs = list_runs()
     seed_run_id = req.seed_run_id
     if not seed_run_id:
-        # Prefer real runs, fallback to first available
-        real_runs = [r for r in runs if r.get("source") == "real"]
-        seed_run_id = real_runs[0]["run_id"] if real_runs else (runs[0]["run_id"] if runs else None)
+        real_runs = [r for r in all_runs if r.get("source") == "real"]
+        seed_run_id = real_runs[0]["run_id"] if real_runs else (all_runs[0]["run_id"] if all_runs else None)
     if not seed_run_id:
         raise HTTPException(status_code=400, detail="No seed runs available")
 
@@ -180,43 +207,31 @@ def generate_continue(req: GenerateRequest):
         dT = np.diff(T, prepend=T[0]).astype(np.float32)
         dT[0] = np.median(dT[1:]) if len(dT) > 1 else 1.0
 
-    seed_window = max(4, min(req.seed_window, len(T)))
-    mask = np.ones(len(T), dtype=bool)
-    if req.seed_asset:
-        mask &= np.array([events[i]["asset"] == req.seed_asset for i in range(len(events))], dtype=bool)
-    if req.min_mag is not None:
-        mask &= np.array([events[i]["mag"] >= req.min_mag for i in range(len(events))], dtype=bool)
-    valid_idx = np.where(mask)[0]
-    if len(valid_idx) == 0:
-        valid_idx = np.arange(len(T))
-    trigger_idx = int(valid_idx[-1])
-    start = max(0, trigger_idx - seed_window + 1)
-    seed = {
-        "T": T[start : trigger_idx + 1],
-        "dT": dT[start : trigger_idx + 1],
-        "W": W[start : trigger_idx + 1],
-        "R": R[start : trigger_idx + 1],
-    }
-
-    model_path = ARTIFACTS_DIR / "model.pt"
-    q_path = ARTIFACTS_DIR / "quantile_model.pt"
+    seed, valid_idx = _build_seed(events, req, T, W, R, dT)
     max_time = req.max_time if req.max_time is not None else 240.0
-
     trim_start = 0
-    if model_path.exists() and q_path.exists():
-        cfg_path = _resolve_config_path(req.config)
+
+    # Phase 2: vMF + Ogata thinning on the sphere
+    p2_model_path = ARTIFACTS_DIR / "phase2" / "model.pt"
+    p2_q_path = ARTIFACTS_DIR / "phase2" / "quantile_model.pt"
+
+    if HAS_PHASE2 and p2_model_path.exists() and p2_q_path.exists():
+        cfg_path = _resolve_config_path("configs/phase2.yaml")
         cfg = load_config(str(cfg_path))
-        model = load_model(str(model_path))
+        model = load_model_p2(str(p2_model_path))
         model.to("cpu")
         model.eval()
-        q_cfg = QuantileModelConfig(**cfg["extremes"]["quantile_model"])
-        q_model = load_quantile_model(str(q_path), model.d_assets, q_cfg)
+        q_cfg = QCfgP2(**cfg["extremes"]["quantile_model"])
+        q_model = load_qmodel_p2(str(p2_q_path), model.d_assets, q_cfg)
         q_model.to("cpu")
         q_model.eval()
-        sim = generate_with_limits(seed, req.max_events, max_time, model, q_model)
+        safety = cfg["simulate"].get("safety_factor", 1.5)
+        sim = ogata_thinning(seed, req.max_events, max_time, model, q_model, safety_factor=safety)
+        # Remove the 'accepted' key that ogata_thinning adds (not needed for export)
+        sim.pop("accepted", None)
         trim_start = max(0, len(seed["T"]) - 1)
     else:
-        # Fallback: random trigger segment after trigger within horizon
+        # Fallback: random trigger segment within horizon
         trigger_idx = int(random.choice(valid_idx))
         t0 = T[trigger_idx]
         mask_time = (T >= t0) & ((T - t0) <= max_time)

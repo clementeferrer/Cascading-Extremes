@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir -r /app/web/api/requirements.txt
 
 COPY web/api /app/web/api
 COPY cascades /app/cascades
+COPY second_phase /app/second_phase
 COPY configs /app/configs
 COPY artifacts /app/artifacts
 COPY --from=frontend /app/web/immersive/dist /app/web/immersive/dist

@@ -14,36 +14,54 @@ This repository implements a **causal transformer** for modeling and generating 
 3. **Hawkes Self-Excitation** for cascade propagation
 4. **Transformer Architecture** for learning complex history-dependent patterns
 
-The system learns from historical extreme events and generates realistic synthetic cascades that preserve the statistical and geometric properties of real market crashes.
+The system learns from historical extreme events and generates realistic synthetic cascades that preserve the statistical and geometric properties of real market crashes and rallies.
 
 ---
 
 ## 1. Data Representation
 
-### 1.1 Standardization to Exponential Margins
+### 1.1 Standardization to Laplace Margins
 
-Raw asset returns are transformed to have **standard exponential margins**:
+Raw asset returns are transformed to have **standard Laplace margins**:
 
 1. Fit GARCH(1,1) with Student-t innovations to each asset's log-returns
-2. Compute standardized residuals: `z_t^j = (r_t^j - μ_t^j) / σ_t^j`
-3. Apply the Probability Integral Transform (PIT):
+2. Compute standardized residuals: `z_t^j = (r_t^j - mu_t^j) / sigma_t^j`
+3. Apply the Probability Integral Transform (PIT) to Laplace margins:
 
 ```
-Y_t^j = -log(1 - F̂_j(z_t^j))
+X_t^j = F_Lap^{-1}(F_hat_j(z_t^j))
 ```
 
-This yields `X_t = (Y_t^1, ..., Y_t^d)` with standard exponential margins.
+where `F_Lap^{-1}(u) = -sign(u - 0.5) * log(1 - 2|u - 0.5|)`.
 
-### 1.2 Radial-Angular Decomposition
+4. Normalize by `log(n/2)` where `n` is the number of observations.
+
+This yields `X_t = (X_t^1, ..., X_t^d)` with standard Laplace margins on the full real line (both positive and negative values).
+
+**Implementation:** See `cascades/preprocess.py` for `standardize()`.
+
+### 1.2 Radial-Angular Decomposition (L2 Norm)
 
 Each observation is decomposed into:
 
-- **Radial component** (magnitude): `R_t = ||X_t||`
-- **Angular component** (direction): `W_t = X_t / R_t ∈ S^{d-1}_+`
+- **Radial component** (magnitude): `R_t = ||X_t||_2` (L2/Euclidean norm)
+- **Angular component** (direction): `W_t = X_t / R_t` on the unit sphere `S^{d-1}`
 
-The direction `W` lives on the positive unit simplex, capturing which assets are most extreme relative to each other.
+The direction `W` lives on the full unit sphere (not the positive simplex), capturing both crashes AND rallies with sign information.
 
-**Implementation:** See `cascades/dataset.py` for the `radial_angular()` function.
+**Implementation:** See `cascades/dataset.py` for `compute_radial_angular()`.
+
+### 1.3 Sign-Aware Geometric Features
+
+The centered log-ratio coordinates are computed with sign awareness:
+
+```
+zeta(W) = sign(W) * log(|W| + eps) - mean(sign(W) * log(|W| + eps))
+```
+
+This handles negative components of W that arise from the sphere representation.
+
+**Implementation:** See `cascades/dataset.py` for `zeta()`.
 
 ---
 
@@ -54,19 +72,19 @@ The direction `W` lives on the positive unit simplex, capturing which assets are
 An extreme event occurs when:
 
 ```
-R_t > u_τ(W_t)
+R_t > u_tau(W_t)
 ```
 
-where `u_τ(w)` is a **direction-dependent quantile threshold** learned via conditional quantile regression. This captures that extremes in different asset combinations may require different magnitude thresholds.
+where `u_tau(w)` is a **direction-dependent quantile threshold** learned via conditional quantile regression. This captures that extremes in different asset combinations may require different magnitude thresholds.
 
-**Implementation:** The `DirectionalQuantileMLP` in `cascades/extremes.py` learns `u_τ(w)`.
+**Implementation:** The `DirectionalQuantileMLP` in `cascades/extremes.py` learns `u_tau(w)`.
 
 ### 2.2 Event Sequence
 
 The sequence of extreme events forms a marked point process:
 
 ```
-N = Σ_i δ_{(T_i, M_i)}
+N = sum_i delta_{(T_i, M_i)}
 ```
 
 where:
@@ -75,94 +93,83 @@ where:
 
 ---
 
-## 3. The Cascading Extremes Transformer
+## 3. Two-Phase Architecture
 
-### 3.1 Token Representation
+### Phase 1: Simplex Model (`cascades/`)
 
-Each event is encoded as a token:
+The original model operating on the positive simplex with exponential margins, L1 norm, and mixture of Dirichlet directions. See `cascades/model.py`.
 
-```
-Φ_i = (W_{T_i}, ζ(W_{T_i}), log R_{T_i}, log ΔT_i)
-```
+### Phase 2: Sphere Model (`second_phase/`)
 
-where:
-- `W` = simplex coordinates (direction)
-- `ζ(W)` = geometric features of direction (see `cascades/dataset.py:zeta()`)
-- `log R` = log-magnitude
-- `log ΔT` = log inter-arrival time
+The full-sphere model with Laplace margins, L2 norm, and von Mises-Fisher directions. This is the model used for generation in the immersive viewer.
 
-### 3.2 Causal Transformer Encoder
-
-A **causal (autoregressive) transformer** maps the event history to latent states:
-
-```
-h_i = Transformer(Φ_{1:i})
-```
-
-The transformer uses:
-- Positional embeddings
-- Causal attention mask (each position only attends to past positions)
-- Multiple self-attention layers
-
-**Implementation:** See `CascadingTransformer.encode()` in `cascades/model.py`.
+| Component | Phase 1 | Phase 2 |
+|-----------|---------|---------|
+| Margins | Exponential: Y = -log(1-F(z)) >= 0 | Laplace: X = F_Lap^{-1}(F(z)) in R |
+| Norm | L1: R = sum X_j | L2: R = \|\|X\|\|_2 |
+| Angular space | Positive simplex S^{d-1}_+ | Full sphere S^{d-1} |
+| Direction dist | Mixture of Dirichlet | Mixture of von Mises-Fisher |
+| Features | zeta(W) = log(W) - mean(log(W)) | xi(W) = [W^2, W_iW_j] (spherical) |
+| Hawkes kernel | k*exp(-dt/tau)*phi(R) | A*K(dt)*kappa(m,m')*phi(R) with attenuation |
+| Genealogy | psi/lambda ratio only | Explicit parent P_i, cluster C(k) |
+| Simulation | Direct exponential sampling | Ogata thinning (exact PP simulation) |
+| Constraints | None | Subcriticality penalty (spectral radius < 1) |
 
 ---
 
-## 4. Three-Head Generative Model
+## 4. Phase 2 Generative Model (Active)
 
-Given the latent state `h_i`, three heads predict the next event.
+### 4.1 Direction Head (Mixture of von Mises-Fisher)
 
-### 4.1 Direction Head (Mixture of Dirichlet)
-
-The next direction is sampled from a **mixture of Dirichlet distributions**:
+The next direction is sampled from a **mixture of vMF distributions** on the sphere:
 
 ```
-W_{i+1} | H_i ~ Σ_k π_{i,k} · Dir(α_{i,k})
+W_{i+1} | H_i ~ sum_k pi_{i,k} * vMF(mu_{i,k}, kappa_{i,k})
 ```
 
 where:
-- `π_i = softmax(Π(h_i))` = mixture weights
-- `α_{i,k} = softplus(A_k(h_i))` = concentration parameters
+- `pi_i = softmax(Pi(h_i))` = mixture weights
+- `mu_{i,k} = normalize(M_k(h_i))` = mean direction on sphere
+- `kappa_{i,k} = softplus(K(h_i))` = concentration parameter
 
-This allows multi-modal directional predictions (e.g., "next extreme could be BTC-dominant or ETH-dominant").
+The vMF density on S^{d-1} for d=3: `C_3(kappa) = kappa / (4*pi*sinh(kappa))`.
 
-**Implementation:** See `dirichlet_params()` and `sample_dirichlet_mixture()` in `cascades/model.py` and `cascades/simulate.py`.
+**Implementation:** See `second_phase/model.py` and `second_phase/distributions.py`.
 
 ### 4.2 Magnitude Head (Truncated Gamma)
 
-Given the predicted direction, the magnitude follows a **truncated Gamma distribution**:
+Same as Phase 1: `R_{i+1} | {W_{i+1}, R > u} ~ TruncGamma(a, beta_{i+1})`.
+
+### 4.3 Time Head (Hawkes with Directional Attenuation)
 
 ```
-R_{i+1} | {W_{i+1}, R > u} ~ TruncGamma(a, β_{i+1})
+lambda_i = mu(h_i) + sum_{j<=i} A * exp(-dt/tau) * kappa(W_i, W_j) * phi(R_j)
 ```
 
-where:
-- `a` = learned shape parameter
-- `β_{i+1} = softplus(Υ(h_i, log R_i, W_{i+1}))` = rate (gauge function)
-- Truncation at `u = u_τ(W_{i+1})` ensures we only generate events exceeding the threshold
+The attenuation `kappa(W_i, W_j) = sigmoid(MLP([W_i, W_j]))` in (0,1] allows directional cross-group transmission.
 
-**Implementation:** See `gauge_rate()` and `sample_trunc_gamma()` in the model/simulate modules.
+A **subcriticality penalty** `max(0, max_row_sum(kernel) - margin)^2` ensures the process doesn't explode.
 
-### 4.3 Time Head (Hawkes Intensity)
+### 4.4 Immigration-Branching Genealogy
 
-The inter-arrival time follows an **exponential distribution** with Hawkes intensity:
+Each event has an explicit parent variable:
+- `P(P_i = 0) = mu_i / lambda_i` (immigrant — exogenous shock)
+- `P(P_i = j) = kernel[i,j] / lambda_i` (offspring of event j)
 
-```
-λ_i = μ(h_i) + Σ_{j≤i} κ(T_i - T_j, h_i, h_j) · φ(R_j)
-```
+Clusters are extracted via BFS from immigrant events.
 
-where:
-- `μ(h_i)` = baseline (exogenous) intensity
-- `κ(Δ, h_i, h_j)` = excitation kernel with learned magnitude and decay
-- `φ(R)` = magnitude impact function
+**Implementation:** See `second_phase/genealogy.py`.
 
-The kernel is:
+### 4.5 Ogata Thinning Simulation
 
-```
-κ(Δ, h_i, h_j) = softplus(k([h_i, h_j])) · exp(-Δ / softplus(τ([h_i, h_j])))
-```
+Generation uses exact point process simulation:
+1. Compute intensity bound `Lambda* = safety_factor * Lambda(T_last)`
+2. Propose `dt ~ Exp(Lambda*)`
+3. Sample candidate mark `(W, R)` from vMF mixture + truncGamma
+4. Accept with probability `lambda(t*, m*) / Lambda*`
+5. Stop when `T > horizon` or `max_events` reached
 
-**Implementation:** See `hawkes_intensity()` in `cascades/model.py`.
+**Implementation:** See `second_phase/simulate.py`.
 
 ---
 
@@ -171,14 +178,14 @@ The kernel is:
 A key interpretable quantity is the **cascade probability**:
 
 ```
-P(cascade | event i) = ψ_i / λ_i
+P(cascade | event i) = psi_i / lambda_i
 ```
 
 where:
-- `ψ_i = Σ_j κ(·) · φ(R_j)` = endogenous (self-excited) component
-- `λ_i = μ_i + ψ_i` = total intensity
+- `psi_i = sum_j kappa(.) * phi(R_j)` = endogenous (self-excited) component
+- `lambda_i = mu_i + psi_i` = total intensity
 
-When `ψ/λ` is high, the event was likely triggered by previous events (a cascade). When low, it's an exogenous shock.
+When `psi/lambda` is high, the event was likely triggered by previous events (a cascade). When low, it's an exogenous shock.
 
 **Visualization:** The immersive viewer colors points by cascade probability (viridis scale: blue=exogenous, yellow=cascade).
 
@@ -186,50 +193,35 @@ When `ψ/λ` is high, the event was likely triggered by previous events (a casca
 
 ## 6. Training Objective
 
-The model is trained by maximizing the joint log-likelihood:
+The model is trained by maximizing the joint log-likelihood with a subcriticality penalty:
 
 ```
-L = Σ_i [ log p(W_{i+1}|h_i) + log p(R_{i+1}|h_i) + log p(ΔT_{i+1}|h_i) ]
+L = sum_i [ log p(W|h) + log p(R|h) + log p(dT|h) ] - subcrit_weight * subcrit_penalty
 ```
 
 Each component:
-- **Direction:** Log-likelihood under the Dirichlet mixture
+- **Direction:** Log-likelihood under the vMF mixture
 - **Magnitude:** Truncated Gamma log-density
-- **Time:** Exponential log-density: `log λ - λ · ΔT`
+- **Time:** Point process: `log lambda - lambda * dT`
+- **Subcriticality:** `max(0, max_row_sum(kernel) - 0.95)^2`
 
-**Implementation:** See `log_likelihood()` in `cascades/model.py` and `cascades/train.py`.
+**Implementation:** See `second_phase/train.py`.
 
 ---
 
-## 7. Generation Algorithm
+## 7. Immersive 3D Viewer
 
-The `generate_with_limits()` function in `cascades/simulate.py` implements autoregressive generation:
+The web viewer displays events on the **unit sphere** inside a `[-1.5, 1.5]^3` cube:
 
-```python
-for each new event:
-    1. Encode history: h = Transformer(tokens)
+- Points are mapped from sphere coordinates `W` with radial scaling by `R/u_tau`
+- A wireframe unit sphere shows the geometric reference
+- Axes helpers show the three asset directions
+- Points colored by cascade probability (viridis: blue=exogenous, yellow=cascade)
+- Camera orbits around origin with zoom controls
 
-    2. Sample direction:
-       - Get mixture params: π, α = dirichlet_params(h)
-       - Sample component k ~ Categorical(π)
-       - Sample W ~ Dirichlet(α_k)
+Generation in the viewer uses the Phase 2 model (vMF + Ogata thinning) when `artifacts/phase2/model.pt` exists, with a random-segment fallback otherwise.
 
-    3. Sample magnitude:
-       - Get rate: β = gauge_rate(h, log R_prev, W)
-       - Get threshold: u = quantile_model(W)
-       - Sample R ~ TruncGamma(a, β; R > u)
-
-    4. Sample timing:
-       - Get intensity: λ = hawkes_intensity(h, T, log R)
-       - Sample ΔT ~ Exponential(λ)
-       - T_new = T_prev + ΔT
-
-    5. Stop if T_new > max_time or num_events > max_events
-```
-
-**Key constraints enforced:**
-- `max_events`: Maximum number of events to generate
-- `max_time`: Horizon beyond which generation stops (relative to seed)
+**Implementation:** See `web/immersive/src/scenes/` and `web/api/main.py`.
 
 ---
 
@@ -237,22 +229,45 @@ for each new event:
 
 ```
 cascades/
-├── dataset.py      # Data loading, tokenization, radial-angular transform
-├── extremes.py     # Directional quantile model for thresholds
-├── model.py        # CascadingTransformer with three heads
-├── train.py        # Training loop and loss computation
-├── simulate.py     # Autoregressive generation algorithm
-└── utils.py        # Configuration, seeding, I/O utilities
+├── dataset.py        # Data loading, tokenization, L2 radial-angular, sign-aware zeta
+├── extremes.py       # Directional quantile model for thresholds
+├── model.py          # CascadingTransformer (Phase 1, Dirichlet)
+├── preprocess.py     # GARCH + PIT → Laplace margins, log(n/2) normalization
+├── train.py          # Phase 1 training loop
+├── simulate.py       # Phase 1 autoregressive generation
+├── viz_export/       # Export runs to parquet for the viewer
+└── utils.py          # Configuration, seeding, I/O utilities
+
+second_phase/
+├── dataset.py        # L2 radial-angular, spherical features, tokens (14-dim for d=3)
+├── extremes.py       # SphericalQuantileMLP for sphere threshold
+├── distributions.py  # vMF density/sampling (Wood 1994), truncGamma, kernels
+├── model.py          # SphericalCascadeTransformer (vMF + attenuation + subcriticality)
+├── train.py          # Full pipeline with subcriticality penalty
+├── simulate.py       # Ogata thinning + parent sampling
+├── genealogy.py      # Parent variables, cluster extraction, Genealogy dataclass
+├── preprocess.py     # GARCH + PIT → Laplace margins (imports from cascades)
+└── utils.py          # Re-exports + sphere helpers (log_vmf_normalizing)
 
 web/
-├── api/main.py     # FastAPI backend for viewer
-└── immersive/      # React + Three.js visualization
+├── api/
+│   ├── main.py       # FastAPI backend (Phase 2 generation via Ogata thinning)
+│   ├── storage.py    # Run storage (parquet I/O)
+│   └── metrics.py    # Summary metrics
+└── immersive/        # React + Three.js visualization
     └── src/
-        ├── pages/ViewerPage.tsx    # Main viewer component
-        ├── scenes/CascadeScene.tsx # 3D scene with simplex
-        └── scenes/EventsPoints.tsx # Point cloud colored by ψ/λ
+        ├── pages/ViewerPage.tsx      # Main viewer component
+        ├── scenes/CascadeScene.tsx   # 3D scene with sphere + cube
+        ├── scenes/SimplexPlane.tsx   # Wireframe unit sphere overlay
+        ├── scenes/CubeFrame.tsx      # [-1.5, 1.5]^3 wireframe cube
+        └── scenes/EventsPoints.tsx   # Point cloud colored by psi/lambda
 
-app.py              # Streamlit dashboard for analysis
+configs/
+├── default.yaml      # Phase 1 config
+└── phase2.yaml       # Phase 2 config (vMF, attenuation, subcriticality)
+
+app.py                # Phase 1 Streamlit dashboard
+app_phase2.py         # Phase 2 Streamlit dashboard (Story, Analyst, Genealogy)
 ```
 
 ---
@@ -261,24 +276,39 @@ app.py              # Streamlit dashboard for analysis
 
 | Component | Distribution | Parameters from Transformer |
 |-----------|-------------|----------------------------|
-| Direction W | Mixture of Dirichlet | π (mixture weights), α (concentrations) |
-| Magnitude R | Truncated Gamma | a (shape), β (rate from gauge network) |
-| Time ΔT | Exponential | λ (Hawkes intensity) |
-| Cascade Prob | ψ/λ | Ratio of endogenous to total intensity |
+| Direction W | Mixture of vMF | pi (weights), mu (mean dirs), kappa (concentrations) |
+| Magnitude R | Truncated Gamma | a (shape), beta (rate from gauge network) |
+| Time dT | Exponential (Hawkes) | lambda (intensity with attenuation) |
+| Cascade Prob | psi/lambda | Ratio of endogenous to total intensity |
+| Subcriticality | Penalty | max(0, max_row_sum - margin)^2 |
 
 ---
 
-## 10. References
+## 10. Deployment
+
+The immersive viewer is deployed on Hugging Face Spaces via Docker:
+
+```bash
+git push space main
+```
+
+The Dockerfile builds the React frontend, copies `cascades/`, `second_phase/`, `configs/`, and `artifacts/`, and runs the FastAPI server on port 7860.
+
+---
+
+## 11. References
 
 This model draws from:
 
 - **Extreme Value Theory:** Radial-angular decomposition, directional thresholds
 - **Marked Point Processes:** Event-based representation of extremes
-- **Hawkes Processes:** Self-exciting temporal dynamics
+- **Hawkes Processes:** Self-exciting temporal dynamics with directional attenuation
+- **von Mises-Fisher Distribution:** Directional statistics on the sphere
+- **Ogata Thinning:** Exact simulation of point processes
 - **Transformers:** History-dependent prediction via causal attention
 
-The combination allows learning and generating realistic cascading extreme events while maintaining interpretability through the cascade probability decomposition.
+The combination allows learning and generating realistic cascading extreme events while maintaining interpretability through the cascade probability decomposition and immigration-branching genealogy.
 
 ---
 
-© 2024-2026 De Carvalho, Ferrer & Vallejos
+(c) 2024-2026 De Carvalho, Ferrer & Vallejos
