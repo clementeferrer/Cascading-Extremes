@@ -33,7 +33,7 @@ export default function LandingPage() {
             stories={[
               {
                 title: "Extremes are not points — they are geometry.",
-                body: "We treat extremes as a marked point process with structure, not isolated outliers. The angular geometry on the simplex encodes direction; the radial exceedance encodes severity.",
+                body: "We treat extremes as a marked point process with structure, not isolated outliers. The angular geometry on the unit sphere encodes direction; the radial exceedance encodes severity.",
               },
               {
                 title: "Memory gives rise to cascades.",
@@ -57,17 +57,16 @@ export default function LandingPage() {
         <div id="process">
           <Counters
             stats={[
-              { label: "Events", value: 320, suffix: "+" },
+              { label: "Events", value: 420, precision: 0 },
               { label: "Assets", value: 3, precision: 0 },
-              { label: "Horizon", value: 240, suffix: "h" },
-              { label: "Branching", value: 0.42, precision: 2 },
+              { label: "Horizon", value: 64, precision: 0 },
             ]}
           />
           <AccordionCards
             items={[
               {
                 title: "EVT Geometry",
-                body: "Direction-dependent thresholds define the extreme region on the simplex with principled gauge functions.",
+                body: "Direction-dependent thresholds define the extreme region on the sphere with principled gauge functions.",
               },
               {
                 title: "Causal Attention",
@@ -81,7 +80,7 @@ export default function LandingPage() {
           />
           <Stepper
             steps={[
-              { title: "Standardize", body: "Map returns to exponential margins with GARCH + PIT." },
+              { title: "Standardize", body: "Map returns to Laplace margins with GARCH + PIT." },
               { title: "Extract", body: "Define geometric extremes via direction-dependent thresholds." },
               { title: "Encode", body: "Tokenize exceedances for the causal Transformer." },
               { title: "Generate", body: "Sample direction, magnitude, and timing sequentially." },

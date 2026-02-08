@@ -19,6 +19,16 @@ from cascades.model import CascadingTransformer, ModelConfig
 from cascades.utils import ensure_dir, load_config
 from cascades.viz_export.schema import RunMeta
 
+# Phase 2 imports (preferred for quantile + intensity when available)
+try:
+    from second_phase.extremes import SphericalQuantileMLP, QuantileModelConfig as P2QuantileModelConfig
+    from second_phase.model import SphericalCascadeTransformer, ModelConfig as P2ModelConfig
+    from second_phase.dataset import build_token_sphere
+
+    _HAS_PHASE2 = True
+except ModuleNotFoundError:
+    _HAS_PHASE2 = False
+
 
 def _config_hash(path: str) -> str:
     data = Path(path).read_bytes()
@@ -30,7 +40,17 @@ def _load_npz(path: Path) -> Dict[str, np.ndarray]:
     return {k: arr[k] for k in arr.files}
 
 
-def _load_quantile_model(cfg, d_assets: int, device: str = "cpu") -> Optional[DirectionalQuantileMLP]:
+def _load_quantile_model(cfg, d_assets: int, device: str = "cpu"):
+    """Load quantile model, preferring Phase 2 SphericalQuantileMLP."""
+    # Try Phase 2 model first
+    p2_path = Path("artifacts") / "phase2" / "quantile_model.pt"
+    if _HAS_PHASE2 and p2_path.exists():
+        q_cfg = P2QuantileModelConfig(**cfg["extremes"]["quantile_model"])
+        model = SphericalQuantileMLP(d_assets, q_cfg.hidden_sizes).to(device)
+        model.load_state_dict(torch.load(p2_path, map_location=device))
+        model.eval()
+        return model
+    # Fallback to Phase 1
     model_path = Path("artifacts") / "quantile_model.pt"
     if not model_path.exists():
         return None
@@ -41,19 +61,16 @@ def _load_quantile_model(cfg, d_assets: int, device: str = "cpu") -> Optional[Di
     return model
 
 
-def _compute_u_tau(source: str, events: Dict[str, np.ndarray], q_model: Optional[DirectionalQuantileMLP]) -> np.ndarray:
-    if source == "real":
-        if "u" not in events:
-            raise ValueError("Real events missing u threshold")
-        return events["u"].astype(np.float32)
-    if q_model is None:
-        # fallback: global quantile
-        r = events["R"].astype(np.float32)
-        return np.full_like(r, np.quantile(r, 0.98), dtype=np.float32)
-    with torch.no_grad():
-        w = torch.tensor(events["W"], dtype=torch.float32)
-        u = q_model(w).cpu().numpy().astype(np.float32)
-    return u
+def _compute_u_tau(source: str, events: Dict[str, np.ndarray], q_model) -> np.ndarray:
+    """Compute u_tau(W) via conditional quantile regression for all sources."""
+    if q_model is not None:
+        with torch.no_grad():
+            w = torch.tensor(events["W"], dtype=torch.float32)
+            u = q_model(w).cpu().numpy().astype(np.float32)
+        return u
+    # fallback: global quantile
+    r = events["R"].astype(np.float32)
+    return np.full_like(r, np.quantile(r, 0.98), dtype=np.float32)
 
 
 def _compute_tokens(W: np.ndarray, R: np.ndarray, dT: np.ndarray) -> np.ndarray:
@@ -61,9 +78,69 @@ def _compute_tokens(W: np.ndarray, R: np.ndarray, dT: np.ndarray) -> np.ndarray:
     return np.concatenate([W, z, np.log(R + 1.0e-8)[:, None], np.log(dT + 1.0e-8)[:, None]], axis=1)
 
 
+def _compute_tokens_p2(W: np.ndarray, R: np.ndarray, dT: np.ndarray) -> np.ndarray:
+    """Build tokens using Phase 2 format: [W, xi(W), log R, log dT]."""
+    return np.stack(
+        [build_token_sphere(W[i], R[i], dT[i]) for i in range(len(W))],
+        axis=0,
+    )
+
+
 def _compute_intensity(events: Dict[str, np.ndarray], model_path: Path) -> Optional[Dict[str, np.ndarray]]:
+    # Try Phase 2 model first
+    p2_path = Path("artifacts") / "phase2" / "model.pt"
+    if _HAS_PHASE2 and p2_path.exists():
+        return _compute_intensity_p2(events, p2_path)
+    # Fallback to Phase 1
     if not model_path.exists():
         return None
+    return _compute_intensity_p1(events, model_path)
+
+
+def _compute_intensity_p2(events: Dict[str, np.ndarray], model_path: Path) -> Optional[Dict[str, np.ndarray]]:
+    """Compute intensity using Phase 2 SphericalCascadeTransformer."""
+    payload = torch.load(model_path, map_location="cpu")
+    cfg = P2ModelConfig(**payload["model_cfg"])
+    model = SphericalCascadeTransformer(d_input=payload["d_input"], d_assets=payload["d_assets"], cfg=cfg)
+    model.load_state_dict(payload["model_state"])
+    model.eval()
+
+    T = events["T"].astype(np.float32)
+    R = events["R"].astype(np.float32)
+    W = events["W"].astype(np.float32)
+    dT = events.get("dT")
+    if dT is None:
+        dT = np.diff(T, prepend=T[0]).astype(np.float32)
+        dT[0] = np.median(dT[1:]) if len(dT) > 1 else 1.0
+    tokens = _compute_tokens_p2(W, R, dT)
+
+    seq_len = tokens.shape[0]
+    max_len = model.cfg.max_len
+
+    lam_out = np.full(seq_len, np.nan, dtype=np.float32)
+    psi_out = np.full(seq_len, np.nan, dtype=np.float32)
+
+    for start in range(0, seq_len, max_len):
+        end = min(seq_len, start + max_len)
+        tokens_t = torch.tensor(tokens[start:end][None, :, :], dtype=torch.float32)
+        T_t = torch.tensor(T[start:end][None, :], dtype=torch.float32)
+        R_t = torch.tensor(R[start:end][None, :], dtype=torch.float32)
+        W_t = torch.tensor(W[start:end][None, :, :], dtype=torch.float32)
+        log_r = torch.log(R_t + 1e-8)
+
+        with torch.no_grad():
+            h = model.encode(tokens_t)
+            lam, psi = model.hawkes_intensity(h, T_t, log_r, W=W_t)
+
+        lam_out[start:end] = lam.squeeze(0).cpu().numpy().astype(np.float32)
+        psi_out[start:end] = psi.squeeze(0).cpu().numpy().astype(np.float32)
+
+    mu_out = lam_out - psi_out
+    return {"lambda": lam_out, "psi": psi_out, "mu": mu_out}
+
+
+def _compute_intensity_p1(events: Dict[str, np.ndarray], model_path: Path) -> Optional[Dict[str, np.ndarray]]:
+    """Compute intensity using Phase 1 CascadingTransformer."""
     payload = torch.load(model_path, map_location="cpu")
     cfg = ModelConfig(**payload["model_cfg"])
     model = CascadingTransformer(d_input=payload["d_input"], d_assets=payload["d_assets"], cfg=cfg)
@@ -85,33 +162,19 @@ def _compute_intensity(events: Dict[str, np.ndarray], model_path: Path) -> Optio
     lam_out = np.full(seq_len, np.nan, dtype=np.float32)
     psi_out = np.full(seq_len, np.nan, dtype=np.float32)
 
-    if seq_len <= max_len:
-        tokens_t = torch.tensor(tokens[None, :, :], dtype=torch.float32)
-        T_tensor = torch.tensor(T[None, :], dtype=torch.float32)
-        R_tensor = torch.tensor(R[None, :], dtype=torch.float32)
-        log_r = torch.log(R_tensor + 1.0e-8)
+    for start in range(0, seq_len, max_len):
+        end = min(seq_len, start + max_len)
+        tokens_t = torch.tensor(tokens[start:end][None, :, :], dtype=torch.float32)
+        T_t = torch.tensor(T[start:end][None, :], dtype=torch.float32)
+        R_t = torch.tensor(R[start:end][None, :], dtype=torch.float32)
+        log_r = torch.log(R_t + 1e-8)
 
         with torch.no_grad():
             h = model.encode(tokens_t)
-            lam, psi = model.hawkes_intensity(h, T_tensor, log_r)
+            lam, psi = model.hawkes_intensity(h, T_t, log_r)
 
-        lam_out[:] = lam.squeeze(0).cpu().numpy().astype(np.float32)
-        psi_out[:] = psi.squeeze(0).cpu().numpy().astype(np.float32)
-    else:
-        # Chunked approximation: intensities computed within each window of max_len.
-        for start in range(0, seq_len, max_len):
-            end = min(seq_len, start + max_len)
-            tokens_chunk = torch.tensor(tokens[start:end][None, :, :], dtype=torch.float32)
-            T_chunk = torch.tensor(T[start:end][None, :], dtype=torch.float32)
-            R_chunk = torch.tensor(R[start:end][None, :], dtype=torch.float32)
-            log_r = torch.log(R_chunk + 1.0e-8)
-
-            with torch.no_grad():
-                h = model.encode(tokens_chunk)
-                lam, psi = model.hawkes_intensity(h, T_chunk, log_r)
-
-            lam_out[start:end] = lam.squeeze(0).cpu().numpy().astype(np.float32)
-            psi_out[start:end] = psi.squeeze(0).cpu().numpy().astype(np.float32)
+        lam_out[start:end] = lam.squeeze(0).cpu().numpy().astype(np.float32)
+        psi_out[start:end] = psi.squeeze(0).cpu().numpy().astype(np.float32)
 
     mu_out = lam_out - psi_out
     return {"lambda": lam_out, "psi": psi_out, "mu": mu_out}
@@ -252,8 +315,6 @@ def export_run(config_path: str, run_id: str, source: str, output_dir: str = "ar
         "W": events["W"],
         "dT": events.get("dT"),
     }
-    if "u" in events:
-        arrays["u_tau"] = events["u"]
     return export_run_from_arrays(config_path, run_id, source, arrays, output_dir)
 
 
