@@ -1,17 +1,6 @@
 {
   "runs": [
     {
-      "run_id": "2026-02-03_real",
-      "created_at": "2026-02-03T06:50:41.154540+00:00",
-      "source": "real",
-      "assets": [
-        "BTC-USD",
-        "ETH-USD",
-        "BNB-USD"
-      ],
-      "path": "artifacts/runs/2026-02-03_real"
-    },
-    {
       "run_id": "2026-02-03_sim",
       "created_at": "2026-02-03T06:50:42.272494+00:00",
       "source": "simulated",
@@ -1330,6 +1319,17 @@
         "BNB-USD"
       ],
       "path": "artifacts/runs/2026-02-04T02-00-45Z_gen"
+    },
+    {
+      "run_id": "2026-02-03_real",
+      "created_at": "2026-02-08T20:20:03.733578+00:00",
+      "source": "real",
+      "assets": [
+        "BTC-USD",
+        "ETH-USD",
+        "BNB-USD"
+      ],
+      "path": "artifacts/runs/2026-02-03_real"
     }
   ]
 }
