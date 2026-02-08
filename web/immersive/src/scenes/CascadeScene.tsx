@@ -15,22 +15,22 @@ interface Props {
   assetLabels?: string[];
 }
 
-// Simplex vertices in 3D space (corners of the unit simplex)
-const SIMPLEX_VERTICES: [number, number, number][] = [
-  [1.08, -0.08, -0.08],   // First asset (e.g., BTC) - offset slightly outward
-  [-0.08, 1.08, -0.08],   // Second asset (e.g., ETH)
-  [-0.08, -0.08, 1.08],   // Third asset (e.g., BNB)
+// Asset labels placed on each positive axis of the unit sphere
+const AXIS_LABEL_POSITIONS: [number, number, number][] = [
+  [1.25, 0, 0],    // +X axis
+  [0, 1.25, 0],    // +Y axis
+  [0, 0, 1.25],    // +Z axis
 ];
 
 const ASSET_COLORS = ["#38bdf8", "#f97316", "#22c55e"];
 
-function SimplexLabels({ labels }: { labels: string[] }) {
+function AxisLabels({ labels }: { labels: string[] }) {
   return (
     <>
       {labels.slice(0, 3).map((label, i) => (
         <Text
           key={i}
-          position={SIMPLEX_VERTICES[i]}
+          position={AXIS_LABEL_POSITIONS[i]}
           fontSize={0.08}
           color={ASSET_COLORS[i]}
           anchorX="center"
@@ -48,16 +48,16 @@ function SimplexLabels({ labels }: { labels: string[] }) {
 export function CascadeScene({ events, currentTime, mapping, showSimplex, pointSize, highlightPoint, assetLabels }: Props) {
   return (
     <Canvas
-      camera={{ position: [2.6, 2.0, 2.8], fov: 42 }}
+      camera={{ position: [3.2, 2.4, 3.2], fov: 42 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#0b1020"]} />
-      <fog attach="fog" args={["#0b1020", 3.0, 8.0]} />
+      <fog attach="fog" args={["#0b1020", 4.0, 10.0]} />
       <ambientLight intensity={0.5} />
       <directionalLight position={[2.5, 2.5, 2]} intensity={1.1} />
       <CubeFrame />
       {showSimplex && <SimplexPlane />}
-      {assetLabels && assetLabels.length >= 3 && <SimplexLabels labels={assetLabels} />}
+      {assetLabels && assetLabels.length >= 3 && <AxisLabels labels={assetLabels} />}
       <EventsPoints events={events} currentTime={currentTime} mapping={mapping} pointSize={pointSize} />
       {highlightPoint && (
         <mesh position={highlightPoint}>
@@ -65,7 +65,7 @@ export function CascadeScene({ events, currentTime, mapping, showSimplex, pointS
           <meshStandardMaterial color="#e76f51" emissive="#e76f51" emissiveIntensity={0.8} />
         </mesh>
       )}
-      <OrbitControls enablePan={false} enableZoom={false} enableRotate={true} target={[0.5, 0.5, 0.5]} />
+      <OrbitControls enablePan={false} enableZoom={true} enableRotate={true} target={[0, 0, 0]} />
     </Canvas>
   );
 }

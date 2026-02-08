@@ -8,11 +8,9 @@ from torch.utils.data import Dataset
 
 
 def compute_radial_angular(X: np.ndarray, eps: float = 1.0e-8) -> Tuple[np.ndarray, np.ndarray]:
-    R = np.sum(X, axis=1)
+    R = np.linalg.norm(X, axis=1)
     R = np.maximum(R, eps)
     W = X / R[:, None]
-    W = np.clip(W, eps, None)
-    W = W / W.sum(axis=1, keepdims=True)
     return R, W
 
 

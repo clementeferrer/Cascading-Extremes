@@ -16,7 +16,7 @@ export function GeometryControls({
       <div className="text-xs uppercase tracking-wide text-slate-400">Geometry</div>
       <label className="flex items-center gap-2 text-[11px] text-slate-300">
         <input type="checkbox" checked={showSimplex} onChange={(e) => onShowSimplexChange(e.target.checked)} />
-        Show simplex plane overlay
+        Show unit sphere overlay
       </label>
       <label className="flex flex-col gap-1 text-[11px] text-slate-300">
         Point size

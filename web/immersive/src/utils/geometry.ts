@@ -4,10 +4,10 @@ export interface CubeMappingParams {
   offsetScale: number;
 }
 
-// Map (W, R, u_tau) to cube coordinates:
-// - W lies on the simplex plane x + y + z = 1 within [0,1]^3.
-// - Exceedance ratio rho = R / u_tau shifts the point along the simplex normal.
-// - rho = 1 -> stays on the plane; rho > 1 -> moves above; rho < 1 -> moves below.
+// Map (W, R, u_tau) to sphere coordinates within [-1.5, 1.5]^3:
+// - W lies on the unit sphere S^{d-1} (L2 norm = 1, can have negative components).
+// - Exceedance ratio rho = R / u_tau scales the point radially outward from the sphere.
+// - rho = 1 -> on the unit sphere; rho > 1 -> outside; rho < 1 -> inside.
 export function mapToCube(w: number[], r: number, uTau: number, params: CubeMappingParams): [number, number, number] {
   const w1 = w[0] ?? 0;
   const w2 = w[1] ?? 0;
@@ -15,16 +15,15 @@ export function mapToCube(w: number[], r: number, uTau: number, params: CubeMapp
   const rho = r / Math.max(uTau, 1e-8);
   const logRho = Math.log(Math.max(rho, 1e-8));
   const z = 1 / (1 + Math.exp(-params.a * (logRho - params.b)));
-  const s = (z - 0.5) * params.offsetScale;
-  const n = 1 / Math.sqrt(3);
-  const x = clamp01(w1 + s * n);
-  const y = clamp01(w2 + s * n);
-  const zc = clamp01(w3 + s * n);
+  const scale = 1 + (z - 0.5) * params.offsetScale;
+  const x = clamp(w1 * scale, -1.5, 1.5);
+  const y = clamp(w2 * scale, -1.5, 1.5);
+  const zc = clamp(w3 * scale, -1.5, 1.5);
   return [x, y, zc];
 }
 
-export function clamp01(v: number): number {
-  if (v < 0) return 0;
-  if (v > 1) return 1;
+export function clamp(v: number, lo: number, hi: number): number {
+  if (v < lo) return lo;
+  if (v > hi) return hi;
   return v;
 }
