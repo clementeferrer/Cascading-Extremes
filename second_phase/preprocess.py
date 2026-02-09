@@ -50,6 +50,8 @@ def standardize_laplace(
         cdfs[col] = cdf
 
     X_df = pd.DataFrame(X)
+    n = max(len(X_df), 2)
+    X_df = X_df / np.log(n / 2)
     return X_df, cdfs
 
 
@@ -58,9 +60,11 @@ def inverse_standardize_laplace(
     cdfs: Dict[str, EmpiricalCDF],
 ) -> pd.DataFrame:
     """Invert Laplace standardization back to GARCH residuals."""
+    n = max(len(X), 2)
+    y = X * np.log(n / 2)
     residuals = {}
     for col in X.columns:
-        series = X[col].dropna()
+        series = y[col].dropna()
         u = laplace_cdf(series.values)
         u = np.clip(u, 1e-6, 1.0 - 1e-6)
         resid = cdfs[col].ppf(u)
