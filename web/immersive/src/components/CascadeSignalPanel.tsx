@@ -42,7 +42,7 @@ export function CascadeSignalPanel({ ratioSeries, assetProbSeries, assetLabels, 
       type: "value",
       min: 0,
       max: 1,
-      name: "Cascade Probability (ψ/λ)",
+      name: "POC (ψ/λ)",
       nameTextStyle: { color: "#475569", fontSize: 11 },
       axisLabel: { color: "#64748b", formatter: (v: number) => v.toFixed(2) },
       splitLine: { lineStyle: { color: "#eef2f7" } },
@@ -131,7 +131,7 @@ export function CascadeSignalPanel({ ratioSeries, assetProbSeries, assetLabels, 
   return (
     <div className="rounded-xl bg-white/90 p-3 shadow-md space-y-4">
       <div>
-        <div className="text-xs uppercase tracking-wide text-slate mb-1">Cascade Probability</div>
+        <div className="text-xs uppercase tracking-wide text-slate mb-1">POC</div>
         <div className="text-[11px] text-slate mb-2">ψ/λ over time. The curve grows with the playhead.</div>
         <ReactECharts option={probOption} style={{ height: 140 }} />
       </div>

@@ -24,7 +24,7 @@ export function VerticalEventTimeline({ items, currentTime, timeScale, onHover, 
   }
   return (
     <div className="h-full w-full rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md shadow-lg p-4 overflow-y-auto">
-      <div className="text-xs uppercase tracking-wide text-slate-400 mb-3">Cascade Timeline</div>
+      <div className="text-xs uppercase tracking-wide text-slate-400 mb-3">Event Timeline</div>
       <div className="space-y-3">
         {items.map((item) => {
           const active = item.t <= currentTime + 1e-6;
@@ -39,7 +39,7 @@ export function VerticalEventTimeline({ items, currentTime, timeScale, onHover, 
             >
               <div className="flex items-center justify-between">
                 <div className="text-[11px] text-slate-400">t = {(item.t * timeScale).toFixed(2)}h</div>
-                <div className="text-[11px] text-slate-400">ψ/λ {item.ratio.toFixed(2)}</div>
+                <div className="text-[11px] text-slate-400">POC {item.ratio.toFixed(2)}</div>
               </div>
               <div className="mt-1 text-sm font-semibold text-white">{item.asset}</div>
               <div className="text-[11px] text-slate-400">{item.context}</div>

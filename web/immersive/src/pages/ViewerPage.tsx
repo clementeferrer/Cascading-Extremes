@@ -264,14 +264,14 @@ export default function ViewerPage() {
     return lam > 0 ? psiVal / lam : 0;
   });
 
-  // Event points with cascade probability (ψ/λ) for coloring
+  // Event points with POC (ψ/λ) for coloring
   const eventPoints = useMemo(
     () => events.map((e, i) => ({
       t: e.t,
       w: e.w,
       mag: e.mag,
       u_tau: e.u_tau,
-      cascadeProb: ratioVals[i] ?? 0,  // ψ/λ - probability of cascade
+      poc: ratioVals[i] ?? 0,
     })),
     [events, ratioVals]
   );

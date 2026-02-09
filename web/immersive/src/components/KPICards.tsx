@@ -28,7 +28,7 @@ export function KPICards({ currentTime, eventCount, lambda, psi, assetCounts }: 
         <div className="text-2xl font-semibold text-white tabular-nums leading-none mt-1">{eventCount}</div>
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-3 shadow-lg h-[84px]">
-        <div className="text-xs uppercase tracking-wide text-slate-400">Cascade Prob</div>
+        <div className="text-xs uppercase tracking-wide text-slate-400">POC</div>
         <div className="text-2xl font-semibold text-white tabular-nums leading-none mt-1">{ratio.toFixed(3)}</div>
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-3 shadow-lg col-span-2 h-[68px]">

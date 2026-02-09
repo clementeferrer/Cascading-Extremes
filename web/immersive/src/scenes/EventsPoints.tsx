@@ -9,7 +9,7 @@ export interface EventPoint {
   w: number[];
   mag: number;
   u_tau: number;
-  cascadeProb?: number;  // ψ/λ ratio - probability of cascade
+  poc?: number;  // ψ/λ ratio - probability of cascade
 }
 
 interface Props {
@@ -32,13 +32,13 @@ export function EventsPoints({ events, currentTime, mapping, pointSize }: Props)
     const mags = new Float32Array(events.length);
     const colors = new Float32Array(events.length * 3);
 
-    // Use cascade probability (ψ/λ) for color if available, otherwise fall back to magnitude
-    const hasCascadeProb = events.some((e) => e.cascadeProb !== undefined);
+    // Use POC (ψ/λ) for color if available, otherwise fall back to magnitude
+    const hasCascadeProb = events.some((e) => e.poc !== undefined);
 
     let colorVals: number[];
     if (hasCascadeProb) {
       // Cascade probability is already in [0, 1] range
-      colorVals = events.map((e) => Math.min(1, Math.max(0, e.cascadeProb ?? 0)));
+      colorVals = events.map((e) => Math.min(1, Math.max(0, e.poc ?? 0)));
     } else {
       // Fall back to normalized magnitude
       const magVals = events.map((e) => e.mag);
@@ -55,7 +55,7 @@ export function EventsPoints({ events, currentTime, mapping, pointSize }: Props)
       positions[i * 3 + 2] = p[2];
       times[i] = e.t;
       mags[i] = colorVals[i];
-      // Color by cascade probability: blue (low) -> yellow/red (high)
+      // Color by POC: blue (low) -> yellow/red (high)
       const [r, g, b] = viridis(colorVals[i]);
       colors[i * 3 + 0] = r;
       colors[i * 3 + 1] = g;
