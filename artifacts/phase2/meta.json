@@ -55,16 +55,17 @@
       "attenuation_hidden": 32,
       "max_len": 256,
       "a_min": 0.001,
+      "tau_min": 1.0,
       "subcrit_margin": 0.95
     },
     "train": {
-      "lr": 0.001,
+      "lr": 0.0003,
       "batch_size": 32,
-      "epochs": 30,
+      "epochs": 200,
       "weight_decay": 0.0001,
       "seed": 42,
       "device": "cpu",
-      "subcrit_weight": 0.1
+      "subcrit_weight": 0.05
     },
     "simulate": {
       "horizon_events": 200,

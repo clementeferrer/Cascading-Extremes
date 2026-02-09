@@ -65,8 +65,12 @@ def train_loop(model, loader, optimizer, device, subcrit_weight: float = 0.0):
         loglik = out["log_p_w"] + out["log_p_r"] + out["log_p_t"]
         loss = -loglik.mean() + subcrit_weight * out["subcrit_penalty"]
 
+        if torch.isnan(loss) or torch.isinf(loss):
+            continue
+
         optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         total_loss += loss.item()

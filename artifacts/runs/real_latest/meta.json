@@ -1,6 +1,6 @@
 {
   "run_id": "real_latest",
-  "created_at": "2026-02-09T04:59:15.846643+00:00",
+  "created_at": "2026-02-09T05:46:21.768745+00:00",
   "source": "real",
   "assets": [
     "BTC-USD",
@@ -13,5 +13,5 @@
     "model": "directional_quantile_mlp"
   },
   "model_checkpoint": "artifacts/model.pt",
-  "config_hash": "sha256:40622465461d48b4197c9d178b0d072a066f8fed581235965568d18ac0bb4d8f"
+  "config_hash": "sha256:6ffdaecb1a1af6a2d6482247db019df678e570359d8373bab050d01bf09f88b7"
 }

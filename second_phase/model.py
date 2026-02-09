@@ -23,6 +23,7 @@ class ModelConfig:
     attenuation_hidden: int = 32
     max_len: int = 256
     a_min: float = 1e-3
+    tau_min: float = 1.0  # minimum decay timescale (hours)
     subcrit_margin: float = 0.95
 
 
@@ -166,7 +167,7 @@ class SphericalCascadeTransformer(nn.Module):
         pair_flat = pair.reshape(-1, 2 * d_model)
 
         k_scale = self.softplus(self.k_net(pair_flat)).view(batch, seq_len, seq_len)
-        tau = self.softplus(self.tau_net(pair_flat)).view(batch, seq_len, seq_len) + self.eps
+        tau = self.softplus(self.tau_net(pair_flat)).view(batch, seq_len, seq_len) + self.cfg.tau_min
 
         delta = T[:, :, None] - T[:, None, :]
         delta = torch.clamp(delta, min=0.0)
@@ -257,7 +258,7 @@ class SphericalCascadeTransformer(nn.Module):
         # --- Time (Hawkes + attenuation) ---
         lam, psi, kernel = self.hawkes_intensity(h, T_in, log_r_in, W=W_in, return_kernel=True)
         lam = torch.clamp(lam, min=self.eps)
-        log_p_t = torch.log(lam) - lam * dT_next
+        log_p_t = torch.log(lam) - lam * torch.clamp(dT_next, max=100.0)
 
         # --- Subcriticality penalty ---
         subcrit = self.subcriticality_penalty(kernel)
