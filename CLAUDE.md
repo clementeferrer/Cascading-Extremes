@@ -172,7 +172,7 @@ Generation works like an LLM producing tokens — the Transformer predicts the n
 6. **Append** the new event and repeat.
 7. **Stop** only when `T > max_time` (no fixed event count).
 
-This is consistent with training because `dT ~ Exp(lambda)` is the exact inverse of the training loss. The cascade probability `psi/lambda` is therefore consistent between real and generated data.
+This is consistent with training because `dT ~ Exp(lambda)` is the exact inverse of the training loss. The POC (`psi/lambda`) is therefore consistent between real and generated data.
 
 The spherical coordinate convention: `W = (sin(phi)*cos(theta), sin(phi)*sin(theta), cos(phi))` where `theta in [0, 2*pi]` (azimuthal) and `phi in [0, pi]` (polar). Canonical asset directions: BTC=(1,0,0) at `theta=0, phi=pi/2`; ETH=(0,1,0) at `theta=pi/2, phi=pi/2`; BNB=(0,0,1) at `theta=0, phi=0`.
 
@@ -180,21 +180,21 @@ The spherical coordinate convention: `W = (sin(phi)*cos(theta), sin(phi)*sin(the
 
 ---
 
-## 5. Cascade Probability
+## 5. POC — Probability of Cascade
 
-A key interpretable quantity is the **cascade probability**:
+A key interpretable quantity is the **POC** (Probability of Cascade):
 
 ```
-P(cascade | event i) = psi_i / lambda_i
+POC_i = psi_i / lambda_i
 ```
 
 where:
 - `psi_i = sum_j kappa(.) * phi(R_j)` = endogenous (self-excited) component
 - `lambda_i = mu_i + psi_i` = total intensity
 
-When `psi/lambda` is high, the event was likely triggered by previous events (a cascade). When low, it's an exogenous shock.
+When POC is high, the event was likely triggered by previous events (a cascade). When low, it's an exogenous shock.
 
-**Visualization:** The immersive viewer colors points by cascade probability (viridis scale: blue=exogenous, yellow=cascade).
+**Visualization:** The immersive viewer colors points by POC (viridis scale: blue=exogenous, yellow=cascade).
 
 ---
 
@@ -218,18 +218,20 @@ Each component:
 
 ## 7. Immersive 3D Viewer
 
-The web viewer displays 297 extreme events on the **unit sphere** inside a `[-1.5, 1.5]^3` cube:
+The web viewer displays 390 extreme events (from 17,520 hourly observations over 2 years) on the **unit sphere** inside a `[-1.5, 1.5]^3` cube:
 
-- Points are mapped from sphere coordinates `W` with radial scaling by exceedance ratio `rho = R/u_tau(W)`
-- Since events are exceedances (`R > u_tau` by definition), all points appear **outside** the unit sphere (`rho > 1`)
+- Points are positioned at `R * W` — the raw radial-angular coordinates
+- Since events are exceedances (`R > u_tau(W)` by definition), most points appear **outside** the unit sphere
 - A wireframe unit sphere shows the threshold boundary — the geometric reference
 - Axes helpers show the three asset directions
-- Points colored by cascade probability (viridis: blue=exogenous, yellow=cascade)
+- Points colored by POC (viridis: blue=exogenous, yellow=cascade)
 - Camera orbits around origin with zoom controls
+
+The **POC** (Probability of Cascade) is `psi/lambda` — the ratio of endogenous to total Hawkes intensity. With `tau_min=1.0` hour, the trained model yields POC ~ 0.20 on real data, meaning ~20% of extreme events are cascade-driven. The Hawkes kernel has a learned decay timescale of ~1.77 hours, so events within 1-5 hours of each other contribute meaningfully to self-excitation.
 
 Generation in the viewer uses the Phase 2 model via **autoregressive sampling** (LLM-style). The user selects an asset (BTC/ETH/BNB), adjusts the direction via spherical coordinates (theta, phi), sets a magnitude R, and sets a time horizon. The Transformer then generates the cascade event by event, stopping only when time exceeds the horizon.
 
-The export pipeline (`cascades/viz_export/export.py`) loads real events from `data/processed_phase2/events.npz` (Phase 2: Laplace margins, L2 norm), uses the Phase 2 `SphericalQuantileMLP` for `u_tau(W)`, and the `SphericalCascadeTransformer` for intensity (lambda, psi) — for **both real and generative** data. It prefers Phase 2 artifacts from `artifacts/phase2/` and falls back to Phase 1 if unavailable.
+The export pipeline (`cascades/viz_export/export.py`) loads real events from `data/processed_phase2/events.npz` (Phase 2: Laplace margins, L2 norm), uses the Phase 2 `SphericalQuantileMLP` for `u_tau(W)`, and the `SphericalCascadeTransformer` for intensity (lambda, psi) — for **both real and generative** data. It prefers Phase 2 artifacts from `artifacts/phase2/` and falls back to Phase 1 if unavailable. When multiple real runs exist, the viewer loads the **most recent** one (by index order).
 
 **Implementation:** See `web/immersive/src/scenes/`, `web/api/main.py`, and `cascades/viz_export/export.py`.
 
@@ -270,7 +272,7 @@ web/
         ├── scenes/CascadeScene.tsx   # 3D scene with sphere + cube
         ├── scenes/SimplexPlane.tsx   # Wireframe unit sphere overlay
         ├── scenes/CubeFrame.tsx      # [-1.5, 1.5]^3 wireframe cube
-        └── scenes/EventsPoints.tsx   # Point cloud colored by psi/lambda
+        └── scenes/EventsPoints.tsx   # Point cloud colored by POC (psi/lambda)
 
 configs/
 ├── default.yaml      # Phase 1 config
@@ -289,7 +291,7 @@ app_phase2.py         # Phase 2 Streamlit dashboard (Story, Analyst, Genealogy)
 | Direction W | Mixture of vMF | pi (weights), mu (mean dirs), kappa (concentrations) |
 | Magnitude R | Truncated Gamma | a (shape), beta (rate from gauge network) |
 | Time dT | Exponential (Hawkes) | lambda (intensity with attenuation) |
-| Cascade Prob | psi/lambda | Ratio of endogenous to total intensity |
+| POC | psi/lambda | Ratio of endogenous to total intensity |
 | Subcriticality | Penalty | max(0, max_row_sum - margin)^2 |
 
 ---
@@ -317,7 +319,7 @@ This model draws from:
 - **Ogata Thinning:** Exact simulation of point processes
 - **Transformers:** History-dependent prediction via causal attention
 
-The combination allows learning and generating realistic cascading extreme events while maintaining interpretability through the cascade probability decomposition and immigration-branching genealogy.
+The combination allows learning and generating realistic cascading extreme events while maintaining interpretability through the POC decomposition and immigration-branching genealogy.
 
 ---
 
