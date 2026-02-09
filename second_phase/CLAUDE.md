@@ -117,17 +117,20 @@ Parent probabilities: `P(P_i = immigrant) = mu_i / lambda_i`, `P(P_i = j) = kern
 
 **Clusters** are extracted via BFS from immigrant roots.
 
-### 7. Ogata Thinning Simulation (`simulate.py`)
+### 7. Autoregressive Generation (`simulate.py`)
 
-Exact point process simulation:
-1. Compute intensity bound `Lambda* = safety_factor * lambda(T_last)`
-2. Propose `dt ~ Exp(Lambda*)`
-3. Sample candidate mark `(W, R)` from vMF mixture + truncated Gamma
-4. Accept with prob `lambda(t*, m*) / Lambda*`
-5. On acceptance: append to history, sample parent
-6. Stop when `T > horizon` or `max_events` reached
+LLM-style generation matching the training objective:
+1. **Prompt**: initial mark `(R, W)` and horizon `H`. R is clamped above `u_tau(W)`.
+2. Encode history via the Transformer: `h = Transformer(tokens_{1:i})`
+3. Sample direction: `W_{i+1} ~ vMF_mixture(pi, mu, kappa)`
+4. Sample magnitude: `R_{i+1} ~ TruncGamma(a, beta; R > u_tau(W))`
+5. Sample timing: `dT_{i+1} ~ Exp(lambda)` — directly matches training loss `log lambda - lambda * dT`
+6. Append event, repeat
+7. Stop when `T > horizon` (no fixed event count)
 
-`prompt_generate()` creates a single shock event and runs Ogata thinning from it.
+`autoregressive_generate()` is called from the web API for interactive generation.
+
+Additionally, Ogata thinning (`ogata_thinning()`) and `prompt_generate()` are available for batch/offline generation with explicit parent sampling.
 
 ---
 

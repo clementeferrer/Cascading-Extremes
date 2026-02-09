@@ -218,17 +218,18 @@ Each component:
 
 ## 7. Immersive 3D Viewer
 
-The web viewer displays events on the **unit sphere** inside a `[-1.5, 1.5]^3` cube:
+The web viewer displays 297 extreme events on the **unit sphere** inside a `[-1.5, 1.5]^3` cube:
 
-- Points are mapped from sphere coordinates `W` with radial scaling by `R/u_tau`
-- A wireframe unit sphere shows the geometric reference
+- Points are mapped from sphere coordinates `W` with radial scaling by exceedance ratio `rho = R/u_tau(W)`
+- Since events are exceedances (`R > u_tau` by definition), all points appear **outside** the unit sphere (`rho > 1`)
+- A wireframe unit sphere shows the threshold boundary — the geometric reference
 - Axes helpers show the three asset directions
 - Points colored by cascade probability (viridis: blue=exogenous, yellow=cascade)
 - Camera orbits around origin with zoom controls
 
-Generation in the viewer uses the Phase 2 model via **autoregressive sampling** (LLM-style). The user selects an asset (BTC/ETH/BNB), adjusts the direction via spherical coordinates (theta, phi), and sets a time horizon. The Transformer then generates the cascade event by event, stopping only when time exceeds the horizon.
+Generation in the viewer uses the Phase 2 model via **autoregressive sampling** (LLM-style). The user selects an asset (BTC/ETH/BNB), adjusts the direction via spherical coordinates (theta, phi), sets a magnitude R, and sets a time horizon. The Transformer then generates the cascade event by event, stopping only when time exceeds the horizon.
 
-The export pipeline (`cascades/viz_export/export.py`) uses the Phase 2 `SphericalQuantileMLP` for `u_tau(W)` and `SphericalCascadeTransformer` for intensity (lambda, psi) — for **both real and generative** data. It prefers Phase 2 artifacts from `artifacts/phase2/` and falls back to Phase 1 if unavailable.
+The export pipeline (`cascades/viz_export/export.py`) loads real events from `data/processed_phase2/events.npz` (Phase 2: Laplace margins, L2 norm), uses the Phase 2 `SphericalQuantileMLP` for `u_tau(W)`, and the `SphericalCascadeTransformer` for intensity (lambda, psi) — for **both real and generative** data. It prefers Phase 2 artifacts from `artifacts/phase2/` and falls back to Phase 1 if unavailable.
 
 **Implementation:** See `web/immersive/src/scenes/`, `web/api/main.py`, and `cascades/viz_export/export.py`.
 
@@ -260,7 +261,7 @@ second_phase/
 
 web/
 ├── api/
-│   ├── main.py       # FastAPI backend (Phase 2 generation via Ogata thinning)
+│   ├── main.py       # FastAPI backend (Phase 2 autoregressive generation)
 │   ├── storage.py    # Run storage (parquet I/O)
 │   └── metrics.py    # Summary metrics
 └── immersive/        # React + Three.js visualization
