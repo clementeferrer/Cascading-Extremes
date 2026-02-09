@@ -84,7 +84,8 @@ export default function ViewerPage() {
         setRuns(data);
         setApiError(null);
         if (!realRunId && data.length > 0) {
-          const realRun = data.find((r) => r.source === "real")?.run_id ?? data[0].run_id;
+          const realRuns = data.filter((r) => r.source === "real");
+          const realRun = (realRuns.length ? realRuns[realRuns.length - 1].run_id : null) ?? data[0].run_id;
           setRealRunId(realRun);
           setSeedRunId(realRun);
           if (mode === "real") {
@@ -192,7 +193,8 @@ export default function ViewerPage() {
 
   useEffect(() => {
     if (!seedRunId && runs.length) {
-      const realRun = runs.find((r) => r.source === "real")?.run_id ?? runs[0].run_id;
+      const realRuns = runs.filter((r) => r.source === "real");
+      const realRun = (realRuns.length ? realRuns[realRuns.length - 1].run_id : null) ?? runs[0].run_id;
       if (realRun) {
         setSeedRunId(realRun);
       }
