@@ -47,7 +47,7 @@ Each observation is decomposed into:
 - **Radial component** (magnitude): `R_t = ||X_t||_2` (L2/Euclidean norm)
 - **Angular component** (direction): `W_t = X_t / R_t` on the unit sphere `S^{d-1}`
 
-The direction `W` lives on the full unit sphere (not the positive simplex), capturing both crashes AND rallies with sign information.
+The direction `W` lives on the full unit sphere (not the positive simplex), capturing both crashes AND rallies with sign information. Positive components encode crashes; negative components encode rallies. The **dominant asset** for each event is determined by `argmax(|W|)` — the component with the largest absolute value, regardless of sign.
 
 **Implementation:** See `cascades/dataset.py` for `compute_radial_angular()`.
 
