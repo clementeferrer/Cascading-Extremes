@@ -75,9 +75,9 @@ An extreme event occurs when:
 R_t > u_tau(W_t)
 ```
 
-where `u_tau(w)` is a **direction-dependent quantile threshold** learned via conditional quantile regression. This captures that extremes in different asset combinations may require different magnitude thresholds.
+where `u_tau(w)` is a **direction-dependent quantile threshold** learned via conditional quantile regression (pinball loss at level `tau = 0.98`). The `SphericalQuantileMLP` takes `[W, W^2, W_iW_j]` as input and outputs `u > 0` via Softplus. This same model is used for **both real and generative** data in the web visualization — no pre-computed thresholds, always conditional quantile regression.
 
-**Implementation:** The `DirectionalQuantileMLP` in `cascades/extremes.py` learns `u_tau(w)`.
+**Implementation:** `second_phase/extremes.py` (`SphericalQuantileMLP`), loaded in `cascades/viz_export/export.py` from `artifacts/phase2/quantile_model.pt`.
 
 ### 2.2 Event Sequence
 
@@ -160,16 +160,23 @@ Clusters are extracted via BFS from immigrant events.
 
 **Implementation:** See `second_phase/genealogy.py`.
 
-### 4.5 Ogata Thinning Simulation
+### 4.5 Autoregressive Generation (LLM-style)
 
-Generation uses exact point process simulation:
-1. Compute intensity bound `Lambda* = safety_factor * Lambda(T_last)`
-2. Propose `dt ~ Exp(Lambda*)`
-3. Sample candidate mark `(W, R)` from vMF mixture + truncGamma
-4. Accept with probability `lambda(t*, m*) / Lambda*`
-5. Stop when `T > horizon` or `max_events` reached
+Generation works like an LLM producing tokens — the Transformer predicts the next event given history:
 
-**Implementation:** See `second_phase/simulate.py`.
+1. **Prompt**: User provides a direction on the sphere via spherical coordinates `(theta, phi)` and a time horizon. The initial magnitude is set just above `u_tau(W_0)`.
+2. **Encode**: The Transformer encodes the event history `h = Transformer(tokens_{1:i})`.
+3. **Sample direction**: `W_{i+1} ~ vMF_mixture(pi, mu, kappa)` — which asset follows in the cascade.
+4. **Sample magnitude**: `R_{i+1} ~ TruncGamma(a, beta; R > u_tau(W))`.
+5. **Sample timing**: `dT_{i+1} ~ Exp(lambda)` where `lambda` is the Hawkes intensity — directly matching the training objective `log lambda - lambda * dT`.
+6. **Append** the new event and repeat.
+7. **Stop** only when `T > max_time` (no fixed event count).
+
+This is consistent with training because `dT ~ Exp(lambda)` is the exact inverse of the training loss. The cascade probability `psi/lambda` is therefore consistent between real and generated data.
+
+The spherical coordinate convention: `W = (sin(phi)*cos(theta), sin(phi)*sin(theta), cos(phi))` where `theta in [0, 2*pi]` (azimuthal) and `phi in [0, pi]` (polar). Canonical asset directions: BTC=(1,0,0) at `theta=0, phi=pi/2`; ETH=(0,1,0) at `theta=pi/2, phi=pi/2`; BNB=(0,0,1) at `theta=0, phi=0`.
+
+**Implementation:** See `second_phase/simulate.py:autoregressive_generate()` and `web/api/main.py`.
 
 ---
 
@@ -219,9 +226,11 @@ The web viewer displays events on the **unit sphere** inside a `[-1.5, 1.5]^3` c
 - Points colored by cascade probability (viridis: blue=exogenous, yellow=cascade)
 - Camera orbits around origin with zoom controls
 
-Generation in the viewer uses the Phase 2 model (vMF + Ogata thinning) when `artifacts/phase2/model.pt` exists, with a random-segment fallback otherwise.
+Generation in the viewer uses the Phase 2 model via **autoregressive sampling** (LLM-style). The user selects an asset (BTC/ETH/BNB), adjusts the direction via spherical coordinates (theta, phi), and sets a time horizon. The Transformer then generates the cascade event by event, stopping only when time exceeds the horizon.
 
-**Implementation:** See `web/immersive/src/scenes/` and `web/api/main.py`.
+The export pipeline (`cascades/viz_export/export.py`) uses the Phase 2 `SphericalQuantileMLP` for `u_tau(W)` and `SphericalCascadeTransformer` for intensity (lambda, psi) — for **both real and generative** data. It prefers Phase 2 artifacts from `artifacts/phase2/` and falls back to Phase 1 if unavailable.
+
+**Implementation:** See `web/immersive/src/scenes/`, `web/api/main.py`, and `cascades/viz_export/export.py`.
 
 ---
 

@@ -53,7 +53,7 @@ export function Counters({ stats }: Props) {
         <h3 className="text-xl font-semibold text-white">By the Numbers</h3>
         <div className="text-xs uppercase tracking-[0.3em] text-slate-500">Credibility</div>
       </div>
-      <div className="mt-8 grid gap-4 md:grid-cols-4">
+      <div className="mt-8 grid gap-4 md:grid-cols-3 max-w-3xl mx-auto">
         {stats.map((stat) => (
           <CounterCard key={stat.label} {...stat} />
         ))}

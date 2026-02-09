@@ -58,9 +58,9 @@ export default function ViewerPage() {
   const [mode, setMode] = useState<"real" | "generative">("real");
   const [seedRunId, setSeedRunId] = useState<string>("");
   const [seedAsset, setSeedAsset] = useState<string>("BTC-USD");
-  const [minMag, setMinMag] = useState<number>(1.0);
-  const [minMagRange, setMinMagRange] = useState<[number, number]>([0.5, 5]);
-  const [horizonHours, setHorizonHours] = useState<number>(10);
+  const [theta, setTheta] = useState<number>(0);
+  const [phi, setPhi] = useState<number>(Math.PI / 2);
+  const [horizonHours, setHorizonHours] = useState<number>(240);
   const [generativeHorizon, setGenerativeHorizon] = useState<number | null>(null);
   const [generating, setGenerating] = useState<boolean>(false);
   const [pendingPlayRunId, setPendingPlayRunId] = useState<string | null>(null);
@@ -178,15 +178,7 @@ export default function ViewerPage() {
         if (metaResp?.assets?.length) {
           setSeedAsset(metaResp.assets[0]);
         }
-        if (evShifted.length) {
-          const mags = evShifted.map((e) => e.mag);
-          const minVal = Math.min(...mags);
-          const maxVal = Math.max(...mags);
-          if (isFinite(minVal) && isFinite(maxVal) && maxVal > minVal) {
-            setMinMagRange([minVal, maxVal]);
-            if (minMag < minVal || minMag > maxVal) setMinMag(minVal);
-          }
-        }
+        // magnitude range no longer needed — generation uses theta/phi directly
       } catch (err) {
         console.error(err);
         setApiError("Failed to load run data. Ensure exports exist and API is running.");
@@ -348,11 +340,10 @@ export default function ViewerPage() {
     setMetrics([]);
     try {
       const seed = Math.floor(Math.random() * 2147483647);
-      console.info("[GENERATE] START", { seedRunId, seedAsset, minMag, horizonHours, seed });
+      console.info("[GENERATE] START", { seedAsset, theta, phi, horizonHours, seed });
       const payload = {
-        seed_run_id: seedRunId || undefined,
-        seed_asset: seedAsset,
-        min_mag: minMag,
+        theta,
+        phi,
         max_time: horizonHours,
         seed,
       };
@@ -457,14 +448,14 @@ export default function ViewerPage() {
                   label: a,
                 }))
               }
-                minMag={minMag}
-                minMagMin={minMagRange[0]}
-                minMagMax={minMagRange[1]}
+                theta={theta}
+                phi={phi}
                 horizon={horizonHours}
                 generating={generating}
                 onModeChange={setMode}
                 onSeedAssetChange={setSeedAsset}
-                onMinMagChange={setMinMag}
+                onThetaChange={setTheta}
+                onPhiChange={setPhi}
                 onHorizonChange={setHorizonHours}
                 onGenerate={() => handleGenerate(true)}
                 viewRunId={realRunId}
