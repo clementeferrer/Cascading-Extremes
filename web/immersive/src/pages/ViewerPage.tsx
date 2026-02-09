@@ -72,7 +72,7 @@ export default function ViewerPage() {
   const [mapping, setMapping] = useState<CubeMappingParams>({
     a: 3.0,
     b: 0.0,
-    offsetScale: 0.28,
+    offsetScale: 0.3,
   });
   const [hoveredEventId, setHoveredEventId] = useState<number | null>(null);
 
