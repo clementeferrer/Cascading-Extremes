@@ -57,9 +57,9 @@ export default function LandingPage() {
         <div id="process">
           <Counters
             stats={[
-              { label: "Events", value: 390, precision: 0 },
+              { label: "Hourly · 2Y", value: 17520, precision: 0 },
               { label: "Assets", value: 3, precision: 0 },
-              { label: "Horizon", value: 64, precision: 0 },
+              { label: "Events", value: 390, precision: 0 },
             ]}
           />
           <AccordionCards
