@@ -301,7 +301,10 @@ def export_run_from_arrays(
 
 def export_run(config_path: str, run_id: str, source: str, output_dir: str = "artifacts/runs") -> Path:
     if source == "real":
-        events_path = Path("data/processed") / "events.npz"
+        # Prefer Phase 2 events (Laplace margins, L2 norm) when available
+        p2_path = Path("data/processed_phase2") / "events.npz"
+        p1_path = Path("data/processed") / "events.npz"
+        events_path = p2_path if p2_path.exists() else p1_path
     else:
         events_path = Path("artifacts") / "simulated_events.npz"
 

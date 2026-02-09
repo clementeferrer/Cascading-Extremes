@@ -57,7 +57,7 @@ export default function LandingPage() {
         <div id="process">
           <Counters
             stats={[
-              { label: "Events", value: 420, precision: 0 },
+              { label: "Events", value: 297, precision: 0 },
               { label: "Assets", value: 3, precision: 0 },
               { label: "Horizon", value: 64, precision: 0 },
             ]}

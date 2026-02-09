@@ -1,0 +1,17 @@
+{
+  "run_id": "real_latest",
+  "created_at": "2026-02-09T04:38:46.056363+00:00",
+  "source": "real",
+  "assets": [
+    "BTC-USD",
+    "ETH-USD",
+    "BNB-USD"
+  ],
+  "freq": "1h",
+  "threshold": {
+    "tau": 0.98,
+    "model": "directional_quantile_mlp"
+  },
+  "model_checkpoint": "artifacts/model.pt",
+  "config_hash": "sha256:40622465461d48b4197c9d178b0d072a066f8fed581235965568d18ac0bb4d8f"
+}
