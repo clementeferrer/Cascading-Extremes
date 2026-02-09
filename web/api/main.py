@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+import torch
 from pydantic import BaseModel
 
 from fastapi import FastAPI, HTTPException, Query
@@ -34,7 +35,7 @@ except ModuleNotFoundError:
 
 # Phase 2 generation (vMF + Ogata thinning on the sphere)
 try:
-    from second_phase.simulate import load_model as load_model_p2, load_quantile_model as load_qmodel_p2, ogata_thinning
+    from second_phase.simulate import load_model as load_model_p2, load_quantile_model as load_qmodel_p2, autoregressive_generate
     from second_phase.extremes import QuantileModelConfig as QCfgP2
 
     HAS_PHASE2 = True
@@ -142,117 +143,59 @@ def run_download(run_id: str, file: str):
 
 
 class GenerateRequest(BaseModel):
-    seed_run_id: Optional[str] = None
-    seed_asset: Optional[str] = None
-    min_mag: Optional[float] = None
-    seed_window: int = 64
-    max_events: int = 256
-    max_time: Optional[float] = 240.0
-    temperature: Optional[float] = 1.0
-    top_k: Optional[int] = 0
-    config: str = "configs/default.yaml"
-    seed: Optional[int] = None  # Random seed for reproducibility
-
-
-def _build_seed(events, req, T, W, R, dT):
-    """Extract seed window from events based on request filters."""
-    seed_window = max(4, min(req.seed_window, len(T)))
-    mask = np.ones(len(T), dtype=bool)
-    if req.seed_asset:
-        mask &= np.array([events[i]["asset"] == req.seed_asset for i in range(len(events))], dtype=bool)
-    if req.min_mag is not None:
-        mask &= np.array([events[i]["mag"] >= req.min_mag for i in range(len(events))], dtype=bool)
-    valid_idx = np.where(mask)[0]
-    if len(valid_idx) == 0:
-        valid_idx = np.arange(len(T))
-    trigger_idx = int(valid_idx[-1])
-    start = max(0, trigger_idx - seed_window + 1)
-    return {
-        "T": T[start : trigger_idx + 1],
-        "dT": dT[start : trigger_idx + 1],
-        "W": W[start : trigger_idx + 1],
-        "R": R[start : trigger_idx + 1],
-    }, valid_idx
+    theta: float = 0.0            # Azimuthal angle theta in [0, 2*pi]
+    phi: float = 1.5708           # Polar angle phi in [0, pi], default pi/2 (BTC axis)
+    max_time: float = 240.0       # Time horizon (hours) — the only stopping criterion
+    config: str = "configs/phase2.yaml"
+    seed: Optional[int] = None    # Random seed for reproducibility
 
 
 @app.post("/generate/continue")
 def generate_continue(req: GenerateRequest):
-    if not HAS_CASCADES:
+    if not HAS_PHASE2:
         raise HTTPException(
             status_code=500,
-            detail="Generation requires cascades package. Run the API from the repo root.",
+            detail="Phase 2 model required for generation.",
         )
-    # Initialize random seed for reproducibility
+
+    # Load Phase 2 model
+    p2_model_path = ARTIFACTS_DIR / "phase2" / "model.pt"
+    p2_q_path = ARTIFACTS_DIR / "phase2" / "quantile_model.pt"
+    if not p2_model_path.exists() or not p2_q_path.exists():
+        raise HTTPException(status_code=500, detail="Phase 2 model artifacts not found.")
+
     if req.seed is not None:
         random.seed(req.seed)
         np.random.seed(req.seed)
-    all_runs = list_runs()
-    seed_run_id = req.seed_run_id
-    if not seed_run_id:
-        real_runs = [r for r in all_runs if r.get("source") == "real"]
-        seed_run_id = real_runs[0]["run_id"] if real_runs else (all_runs[0]["run_id"] if all_runs else None)
-    if not seed_run_id:
-        raise HTTPException(status_code=400, detail="No seed runs available")
 
-    events = read_events(seed_run_id, 0, 200000)
-    if not events:
-        raise HTTPException(status_code=404, detail="Seed run has no events")
+    cfg_path = _resolve_config_path("configs/phase2.yaml")
+    cfg = load_config(str(cfg_path))
+    model = load_model_p2(str(p2_model_path))
+    model.to("cpu")
+    model.eval()
+    q_cfg = QCfgP2(**cfg["extremes"]["quantile_model"])
+    q_model = load_qmodel_p2(str(p2_q_path), model.d_assets, q_cfg)
+    q_model.to("cpu")
+    q_model.eval()
 
-    W = np.array([e["w"] for e in events], dtype=np.float32)
-    R = np.array([e["mag"] for e in events], dtype=np.float32)
-    T = np.array([e["t"] for e in events], dtype=np.float32)
-    if len(T) < 2:
-        dT = np.ones_like(T, dtype=np.float32)
-    else:
-        dT = np.diff(T, prepend=T[0]).astype(np.float32)
-        dT[0] = np.median(dT[1:]) if len(dT) > 1 else 1.0
+    # Convert spherical coordinates to direction on S^2
+    theta, phi = req.theta, req.phi
+    w0 = np.array([
+        np.sin(phi) * np.cos(theta),
+        np.sin(phi) * np.sin(theta),
+        np.cos(phi),
+    ], dtype=np.float32)
+    # Normalize (safety)
+    norm = np.linalg.norm(w0)
+    if norm > 1e-8:
+        w0 = w0 / norm
 
-    seed, valid_idx = _build_seed(events, req, T, W, R, dT)
-    max_time = req.max_time if req.max_time is not None else 240.0
-    trim_start = 0
+    # Initial magnitude: just above the directional threshold
+    u0 = q_model(torch.tensor(w0[None, :], dtype=torch.float32)).item()
+    r0 = u0 + 0.5
 
-    # Phase 2: vMF + Ogata thinning on the sphere
-    p2_model_path = ARTIFACTS_DIR / "phase2" / "model.pt"
-    p2_q_path = ARTIFACTS_DIR / "phase2" / "quantile_model.pt"
-
-    if HAS_PHASE2 and p2_model_path.exists() and p2_q_path.exists():
-        cfg_path = _resolve_config_path("configs/phase2.yaml")
-        cfg = load_config(str(cfg_path))
-        model = load_model_p2(str(p2_model_path))
-        model.to("cpu")
-        model.eval()
-        q_cfg = QCfgP2(**cfg["extremes"]["quantile_model"])
-        q_model = load_qmodel_p2(str(p2_q_path), model.d_assets, q_cfg)
-        q_model.to("cpu")
-        q_model.eval()
-        safety = cfg["simulate"].get("safety_factor", 1.5)
-        sim = ogata_thinning(seed, req.max_events, max_time, model, q_model, safety_factor=safety)
-        # Remove the 'accepted' key that ogata_thinning adds (not needed for export)
-        sim.pop("accepted", None)
-        trim_start = max(0, len(seed["T"]) - 1)
-    else:
-        # Fallback: random trigger segment within horizon
-        trigger_idx = int(random.choice(valid_idx))
-        t0 = T[trigger_idx]
-        mask_time = (T >= t0) & ((T - t0) <= max_time)
-        idx = np.where(mask_time)[0][: req.max_events]
-        if len(idx) == 0:
-            idx = np.array([trigger_idx])
-        sim = {
-            "T": T[idx],
-            "dT": dT[idx],
-            "W": W[idx],
-            "R": R[idx],
-        }
-        trim_start = 0
-
-    # Keep only trigger + generated continuation, then rebase time to start at 0
-    for key in ("T", "dT", "W", "R"):
-        sim[key] = sim[key][trim_start:]
-    sim["T"] = sim["T"] - sim["T"][0]
-    if len(sim["T"]) > 1:
-        sim["dT"] = np.diff(sim["T"], prepend=sim["T"][0]).astype(np.float32)
-        sim["dT"][0] = np.median(sim["dT"][1:]) if len(sim["dT"]) > 1 else 1.0
+    # Autoregressive generation — only max_time stops the cascade
+    sim = autoregressive_generate(w0, r0, req.max_time, model, q_model)
 
     run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ_gen")
     cfg_path = _resolve_config_path(req.config)

@@ -36,16 +36,11 @@ export async function getSummary(runId: string): Promise<Record<string, unknown>
 }
 
 export async function generateContinue(payload: {
-  seed_run_id?: string;
-  seed_asset?: string;
-  min_mag?: number;
-  seed_window?: number;
-  max_events?: number;
-  max_time?: number;
-  temperature?: number;
-  top_k?: number;
+  theta: number;
+  phi: number;
+  max_time: number;
   config?: string;
-  seed?: number;  // Random seed for reproducibility
+  seed?: number;
 }): Promise<{ run_id: string }> {
   const res = await fetch(`${API_URL}/generate`, {
     method: "POST",

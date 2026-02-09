@@ -87,6 +87,60 @@ def _sample_candidate(model, h, R_hist, q_model, d_assets):
     return w_next, r_next
 
 
+def autoregressive_generate(
+    w0: np.ndarray,
+    r0: float,
+    max_time: float,
+    model: SphericalCascadeTransformer,
+    q_model: SphericalQuantileMLP,
+    max_events_cap: int = 2000,
+) -> Dict[str, np.ndarray]:
+    """LLM-style autoregressive generation of cascading extremes.
+
+    Given an initial shock (w0, r0) on the sphere, the Transformer generates
+    the cascade event by event:
+      1. Encode history -> h
+      2. Sample direction W ~ vMF mixture (which asset follows)
+      3. Sample magnitude R ~ TruncGamma(a, beta; R > u_tau(W))
+      4. Sample timing dT ~ Exp(lambda) from Hawkes intensity
+      5. Append event, repeat
+
+    Stops only when T exceeds max_time (no fixed event count).
+    """
+    d_assets = model.d_assets
+    W = [w0.astype(np.float32)]
+    R = [float(r0)]
+    T = [0.0]
+    dT_list = [1.0]  # median placeholder for first event
+
+    for _ in range(max_events_cap):
+        h, tokens_t, W_hist, R_hist, T_hist = _encode_history(model, W, R, dT_list, T)
+
+        # 1. Sample next mark (direction + magnitude)
+        w_next, r_next = _sample_candidate(model, h, R, q_model, d_assets)
+
+        # 2. Sample timing from Hawkes intensity: dT ~ Exp(lambda)
+        lam, psi = _compute_intensity(model, h, T_hist, R_hist, W_hist)
+        lam = max(lam, 1e-6)
+        dt_next = float(np.random.exponential(1.0 / lam))
+        t_next = T[-1] + dt_next
+
+        if t_next > max_time:
+            break
+
+        W.append(w_next)
+        R.append(r_next)
+        dT_list.append(dt_next)
+        T.append(t_next)
+
+    return {
+        "T": np.array(T, dtype=np.float32),
+        "dT": np.array(dT_list, dtype=np.float32),
+        "W": np.array(W, dtype=np.float32),
+        "R": np.array(R, dtype=np.float32),
+    }
+
+
 def ogata_thinning(
     seed: Dict[str, np.ndarray],
     max_events: int,
