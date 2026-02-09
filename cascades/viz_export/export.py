@@ -218,7 +218,7 @@ def export_run_from_arrays(
     model_path = Path("artifacts") / "model.pt"
     intensity = _compute_intensity({"T": T, "R": R, "W": W, "dT": dT}, model_path)
 
-    dominant_idx = np.argmax(W, axis=1)
+    dominant_idx = np.argmax(np.abs(W), axis=1)
     asset_names = [assets[i] if i < len(assets) else f"asset_{i}" for i in dominant_idx]
 
     df_events = pd.DataFrame(
