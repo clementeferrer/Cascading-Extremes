@@ -12,6 +12,7 @@ interface Props {
   assetOptions: { id: string; label: string }[];
   theta: number;
   phi: number;
+  magnitude: number;
   horizon: number;
   generating: boolean;
   onModeChange: (v: "real" | "generative") => void;
@@ -19,6 +20,7 @@ interface Props {
   onSeedAssetChange: (v: string) => void;
   onThetaChange: (v: number) => void;
   onPhiChange: (v: number) => void;
+  onMagnitudeChange: (v: number) => void;
   onHorizonChange: (v: number) => void;
   onGenerate: () => void;
 }
@@ -31,6 +33,7 @@ export function GenerationControls({
   assetOptions,
   theta,
   phi,
+  magnitude,
   horizon,
   generating,
   onModeChange,
@@ -38,6 +41,7 @@ export function GenerationControls({
   onSeedAssetChange,
   onThetaChange,
   onPhiChange,
+  onMagnitudeChange,
   onHorizonChange,
   onGenerate,
 }: Props) {
@@ -140,6 +144,20 @@ export function GenerationControls({
               disabled={mode !== "generative"}
             />
             <div className="text-[10px] text-slate-400">{phi.toFixed(2)} rad</div>
+          </label>
+          <label className="col-span-2 flex flex-col gap-1 text-slate-300">
+            R (magnitude)
+            <input
+              type="range"
+              min={0.5}
+              max={15}
+              step={0.1}
+              value={magnitude}
+              onChange={(e) => onMagnitudeChange(Number(e.target.value))}
+              className="accent-teal-300"
+              disabled={mode !== "generative"}
+            />
+            <div className="text-[10px] text-slate-400">{magnitude.toFixed(1)}</div>
           </label>
         </div>
       )}

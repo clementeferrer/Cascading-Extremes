@@ -38,6 +38,7 @@ export async function getSummary(runId: string): Promise<Record<string, unknown>
 export async function generateContinue(payload: {
   theta: number;
   phi: number;
+  magnitude: number;
   max_time: number;
   config?: string;
   seed?: number;

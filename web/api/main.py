@@ -145,6 +145,7 @@ def run_download(run_id: str, file: str):
 class GenerateRequest(BaseModel):
     theta: float = 0.0            # Azimuthal angle theta in [0, 2*pi]
     phi: float = 1.5708           # Polar angle phi in [0, pi], default pi/2 (BTC axis)
+    magnitude: float = 3.0        # Radial magnitude R of the initial shock
     max_time: float = 240.0       # Time horizon (hours) — the only stopping criterion
     config: str = "configs/phase2.yaml"
     seed: Optional[int] = None    # Random seed for reproducibility
@@ -190,9 +191,9 @@ def generate_continue(req: GenerateRequest):
     if norm > 1e-8:
         w0 = w0 / norm
 
-    # Initial magnitude: just above the directional threshold
+    # Initial magnitude: user-provided R, clamped above threshold
     u0 = q_model(torch.tensor(w0[None, :], dtype=torch.float32)).item()
-    r0 = u0 + 0.5
+    r0 = max(req.magnitude, u0 + 0.01)
 
     # Autoregressive generation — only max_time stops the cascade
     sim = autoregressive_generate(w0, r0, req.max_time, model, q_model)

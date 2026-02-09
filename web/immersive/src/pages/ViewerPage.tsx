@@ -60,6 +60,7 @@ export default function ViewerPage() {
   const [seedAsset, setSeedAsset] = useState<string>("BTC-USD");
   const [theta, setTheta] = useState<number>(0);
   const [phi, setPhi] = useState<number>(Math.PI / 2);
+  const [magnitude, setMagnitude] = useState<number>(3.0);
   const [horizonHours, setHorizonHours] = useState<number>(240);
   const [generativeHorizon, setGenerativeHorizon] = useState<number | null>(null);
   const [generating, setGenerating] = useState<boolean>(false);
@@ -340,10 +341,11 @@ export default function ViewerPage() {
     setMetrics([]);
     try {
       const seed = Math.floor(Math.random() * 2147483647);
-      console.info("[GENERATE] START", { seedAsset, theta, phi, horizonHours, seed });
+      console.info("[GENERATE] START", { seedAsset, theta, phi, magnitude, horizonHours, seed });
       const payload = {
         theta,
         phi,
+        magnitude,
         max_time: horizonHours,
         seed,
       };
@@ -450,12 +452,14 @@ export default function ViewerPage() {
               }
                 theta={theta}
                 phi={phi}
+                magnitude={magnitude}
                 horizon={horizonHours}
                 generating={generating}
                 onModeChange={setMode}
                 onSeedAssetChange={setSeedAsset}
                 onThetaChange={setTheta}
                 onPhiChange={setPhi}
+                onMagnitudeChange={setMagnitude}
                 onHorizonChange={setHorizonHours}
                 onGenerate={() => handleGenerate(true)}
                 viewRunId={realRunId}

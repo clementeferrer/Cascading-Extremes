@@ -164,7 +164,7 @@ Clusters are extracted via BFS from immigrant events.
 
 Generation works like an LLM producing tokens — the Transformer predicts the next event given history:
 
-1. **Prompt**: User provides a direction on the sphere via spherical coordinates `(theta, phi)` and a time horizon. The initial magnitude is set just above `u_tau(W_0)`.
+1. **Prompt**: User provides the initial mark `(R, W)` — magnitude `R` and direction `W` via spherical coordinates `(theta, phi)` — plus a time horizon `H`. If `R < u_tau(W)`, it is clamped above the threshold to ensure an exceedance.
 2. **Encode**: The Transformer encodes the event history `h = Transformer(tokens_{1:i})`.
 3. **Sample direction**: `W_{i+1} ~ vMF_mixture(pi, mu, kappa)` — which asset follows in the cascade.
 4. **Sample magnitude**: `R_{i+1} ~ TruncGamma(a, beta; R > u_tau(W))`.
