@@ -319,9 +319,9 @@ export default function ViewerPage() {
   );
 
   const sparkSeries = [
-    { name: "λ(t)", color: "#9aa6b6", data: downsamplePairs(metricTimes, lambdaVals, 240) },
-    { name: "μ(t)", color: "#b6a893", data: downsamplePairs(metricTimes, muVals, 240) },
-    { name: "ψ(t)", color: "#a39db9", data: downsamplePairs(metricTimes, psiVals, 240) },
+    { name: "λ(t)", color: "#6f86a3", data: downsamplePairs(metricTimes, lambdaVals, 240) },
+    { name: "μ(t)", color: "#8a9770", data: downsamplePairs(metricTimes, muVals, 240) },
+    { name: "ψ(t)", color: "#8f7ea6", data: downsamplePairs(metricTimes, psiVals, 240) },
   ];
 
   const timelineItems = useMemo(() => {

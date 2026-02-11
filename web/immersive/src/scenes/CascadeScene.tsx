@@ -76,7 +76,7 @@ export function CascadeScene({
 }: Props) {
   return (
     <Canvas
-      camera={{ position: [2.55, 2.95, 1.95], fov: 41 }}
+      camera={{ position: [2.7, 2.45, 1.35], fov: 40 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#0b1020"]} />
@@ -106,7 +106,7 @@ export function CascadeScene({
         enablePan={false}
         enableZoom
         enableRotate
-        target={[0, 0.03, 0]}
+        target={[0, 0.02, 0]}
         maxPolarAngle={1.52}
       />
     </Canvas>
