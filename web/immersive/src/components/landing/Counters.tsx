@@ -47,13 +47,16 @@ function CounterCard({ label, value, suffix, precision }: Stat) {
 }
 
 export function Counters({ stats }: Props) {
+  const mdColsClass = stats.length <= 2 ? "md:grid-cols-2" : "md:grid-cols-3";
+  const maxWidthClass = stats.length <= 2 ? "max-w-4xl" : "max-w-3xl";
+
   return (
     <section className="py-16 border-t border-white/5">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-semibold text-white">By the Numbers</h3>
         <div className="text-xs uppercase tracking-[0.3em] text-slate-500">Credibility</div>
       </div>
-      <div className="mt-8 grid gap-4 md:grid-cols-3 max-w-3xl mx-auto">
+      <div className={`mt-8 grid gap-4 ${mdColsClass} ${maxWidthClass} mx-auto`}>
         {stats.map((stat) => (
           <CounterCard key={stat.label} {...stat} />
         ))}

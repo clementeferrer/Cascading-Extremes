@@ -248,7 +248,6 @@ export default function ViewerPage() {
 
   const times = useMemo(() => events.map((e) => e.t), [events]);
   const idx = times.length ? binarySearch(times, currentTime) : 0;
-  const eventCount = times.length ? idx + 1 : 0;
 
   const metricIdx = metrics.length ? Math.min(metrics.length - 1, idx) : 0;
   const lambda = metrics.length ? metrics[metricIdx].lambda ?? undefined : undefined;
@@ -439,7 +438,6 @@ export default function ViewerPage() {
             )}
             <KPICards
               currentTime={displayTime}
-              eventCount={eventCount}
               lambda={lambda}
               psi={psi}
             />

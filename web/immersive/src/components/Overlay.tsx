@@ -11,7 +11,6 @@ interface Props {
   currentTime: number;
   displayTime: number;
   displayMaxTime: number;
-  eventCount: number;
   lambda?: number;
   psi?: number;
   sparkSeries: { name: string; color: string; data: [number, number][] }[];
@@ -43,7 +42,6 @@ export function Overlay({
   currentTime,
   displayTime,
   displayMaxTime,
-  eventCount,
   lambda,
   psi,
   sparkSeries,
@@ -92,7 +90,6 @@ export function Overlay({
       <div className="pointer-events-auto mt-6 px-8">
         <KPICards
           currentTime={displayTime}
-          eventCount={eventCount}
           lambda={lambda}
           psi={psi}
         />

@@ -59,7 +59,6 @@ export default function LandingPage() {
             stats={[
               { label: "Hourly · 2Y", value: 17520, precision: 0 },
               { label: "Assets", value: 3, precision: 0 },
-              { label: "Extreme Events", value: 390, precision: 0 },
             ]}
           />
           <AccordionCards
