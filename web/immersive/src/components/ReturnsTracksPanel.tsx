@@ -151,11 +151,11 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
         animation: false,
         itemStyle: {
           color: "#fbbf24",
-          opacity: 0.74,
-          borderColor: "rgba(254,243,199,0.45)",
+          opacity: 0.68,
+          borderColor: "rgba(254,243,199,0.38)",
           borderWidth: 1,
-          shadowBlur: 1.5,
-          shadowColor: "rgba(251,191,36,0.10)",
+          shadowBlur: 0.8,
+          shadowColor: "rgba(251,191,36,0.06)",
         },
         z: 8,
       };
@@ -167,7 +167,7 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
       title: {
         text: "Asset Returns (% log-return)",
         left: 14,
-        top: 0,
+        top: -4,
         textStyle: { color: "#e2e8f0", fontSize: 12, fontWeight: 600 },
       },
       grid,

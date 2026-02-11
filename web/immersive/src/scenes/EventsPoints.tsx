@@ -61,7 +61,7 @@ export function EventsPoints({ events, currentTime, mapping, pointSize }: Props)
     <points geometry={geometry} frustumCulled={false}>
       <pointsMaterial
         ref={materialRef}
-        color="#ef4444"
+        color="#fbbf24"
         size={pointSize}
         sizeAttenuation
         transparent={false}
