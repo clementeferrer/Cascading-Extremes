@@ -483,7 +483,12 @@ export default function ViewerPage() {
               lambda={lambda}
               psi={psi}
             />
-            <Sparklines series={sparkSeries} currentTime={currentTime} />
+            <Sparklines
+              series={sparkSeries}
+              currentTime={currentTime}
+              timeScale={timeScale}
+              startDatetimeUtc={returnsData?.alignment.start_datetime_utc}
+            />
             <GeometryControls
               showSimplex={showSimplex}
               onShowSimplexChange={setShowSimplex}
@@ -541,6 +546,10 @@ export default function ViewerPage() {
                   <ReturnsTracksPanel
                     data={returnsData}
                     currentTime={displayTime}
+                    events={events}
+                    timeScale={timeScale}
+                    highlightPositiveOctant={highlightPositiveOctant}
+                    highlightNegativeOctant={highlightNegativeOctant}
                     loading={returnsLoading}
                     error={returnsError}
                   />

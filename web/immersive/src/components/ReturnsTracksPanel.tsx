@@ -1,10 +1,14 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
-import { RunReturnsResponse } from "../api/types";
+import { EventRecord, RunReturnsResponse } from "../api/types";
 
 interface Props {
   data: RunReturnsResponse | null;
   currentTime: number;
+  events: EventRecord[];
+  timeScale: number;
+  highlightPositiveOctant: boolean;
+  highlightNegativeOctant: boolean;
   loading?: boolean;
   error?: string | null;
 }
@@ -14,9 +18,14 @@ const ASSET_COLORS: Record<string, string> = {
   ETH: "#f97316",
   BNB: "#22c55e",
 };
+const EPS = 1e-6;
 
 function shortAsset(asset: string) {
   return asset.replace("-USD", "").toUpperCase();
+}
+
+function normalizeAsset(asset: string) {
+  return asset.trim().toUpperCase();
 }
 
 function downsamplePairs(data: [number, number][], maxPoints = 2500): [number, number][] {
@@ -40,7 +49,16 @@ function formatUtcDate(startIso: string | null | undefined, hourIndex: number, d
   return dt.toISOString().slice(5, 16).replace("T", " ");
 }
 
-export function ReturnsTracksPanel({ data, currentTime, loading = false, error = null }: Props) {
+export function ReturnsTracksPanel({
+  data,
+  currentTime,
+  events,
+  timeScale,
+  highlightPositiveOctant,
+  highlightNegativeOctant,
+  loading = false,
+  error = null,
+}: Props) {
   const option = useMemo(() => {
     if (!data || !data.assets.length) {
       return null;
@@ -53,6 +71,14 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
       return Math.max(acc, localMax);
     }, 0);
     const playhead = Math.max(0, Math.min(currentTime, maxX));
+    const positiveKeys = new Set<string>();
+    const negativeKeys = new Set<string>();
+    for (const e of events) {
+      const tHour = Math.round((e.t ?? 0) * timeScale);
+      const key = `${normalizeAsset(e.asset)}|${tHour}`;
+      if (e.w.every((v) => v > EPS)) positiveKeys.add(key);
+      if (e.w.every((v) => v < -EPS)) negativeKeys.add(key);
+    }
 
     const grid = assets.map((_, idx) => ({
       left: 58,
@@ -139,23 +165,48 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
 
     const extremeSeries = assets.map((asset, idx) => {
       const key = shortAsset(asset);
-      const extremes = ((data.extreme_points[asset] ?? []) as [number, number][])
-        .filter(([t]) => t <= playhead + 1.0e-6);
+      const assetKey = normalizeAsset(asset);
+      const extremes = ((data.extreme_points[asset] ?? []) as [number, number][]).filter(
+        ([t]) => t <= playhead + 1.0e-6
+      );
+      const scatterData = extremes.map(([t, v]) => {
+        const mapKey = `${assetKey}|${Math.round(t)}`;
+        const isPositiveOctant = positiveKeys.has(mapKey);
+        const isNegativeOctant = negativeKeys.has(mapKey);
+        const positiveActive = highlightPositiveOctant && isPositiveOctant;
+        const negativeActive = highlightNegativeOctant && isNegativeOctant;
+        const color = positiveActive ? "#14b8a6" : negativeActive ? "#fb7185" : "#fbbf24";
+        const borderColor = positiveActive
+          ? "rgba(153,246,228,0.52)"
+          : negativeActive
+            ? "rgba(254,205,211,0.52)"
+            : "rgba(254,243,199,0.36)";
+        const opacity = positiveActive || negativeActive ? 0.78 : 0.56;
+        return {
+          value: [t, v],
+          itemStyle: {
+            color,
+            opacity,
+            borderColor,
+            borderWidth: 1,
+            shadowBlur: 0,
+          },
+        };
+      });
       return {
         name: `${key} Extreme`,
         type: "scatter",
         xAxisIndex: idx,
         yAxisIndex: idx,
-        data: extremes,
+        data: scatterData,
         symbolSize: 5,
         animation: false,
         itemStyle: {
           color: "#fbbf24",
-          opacity: 0.68,
+          opacity: 0.56,
           borderColor: "rgba(254,243,199,0.38)",
           borderWidth: 1,
-          shadowBlur: 0.8,
-          shadowColor: "rgba(251,191,36,0.06)",
+          shadowBlur: 0,
         },
         z: 8,
       };
@@ -167,7 +218,7 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
       title: {
         text: "Asset Returns (% log-return)",
         left: 14,
-        top: -8,
+        top: -2,
         textStyle: { color: "#e2e8f0", fontSize: 12, fontWeight: 600 },
       },
       grid,
@@ -194,7 +245,7 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
       },
       series: [...lineSeries, ...extremeSeries],
     };
-  }, [data, currentTime]);
+  }, [data, currentTime, events, timeScale, highlightPositiveOctant, highlightNegativeOctant]);
 
   if (loading) {
     return (

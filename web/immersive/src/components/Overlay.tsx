@@ -97,7 +97,12 @@ export function Overlay({
 
       <div className="pointer-events-auto mt-4 px-8 flex gap-4 items-start">
         <div className="w-[360px] space-y-4">
-          <Sparklines series={sparkSeries} currentTime={currentTime} />
+          <Sparklines
+            series={sparkSeries}
+            currentTime={currentTime}
+            timeScale={timeScale}
+            startDatetimeUtc={null}
+          />
           {scenarioVisible && (
             <ScenarioControls
               enabled={scenarioEnabled}
