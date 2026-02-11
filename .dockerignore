@@ -7,4 +7,7 @@
 .DS_Store
 .pytest_cache
 app.py
-data/
+data/*
+!data/raw/
+data/raw/*
+!data/raw/prices_1h_730d.csv

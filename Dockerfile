@@ -21,7 +21,7 @@ COPY web/api /app/web/api
 COPY cascades /app/cascades
 COPY second_phase /app/second_phase
 COPY configs /app/configs
-COPY data /app/data
+COPY data/raw/prices_1h_730d.csv /app/data/raw/prices_1h_730d.csv
 COPY artifacts /app/artifacts
 COPY --from=frontend /app/web/immersive/dist /app/web/immersive/dist
 
