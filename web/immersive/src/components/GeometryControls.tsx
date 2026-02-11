@@ -39,7 +39,7 @@ export function GeometryControls({
         </select>
       </label>
       <div className="space-y-2 pt-1">
-        <div className="text-[11px] uppercase tracking-wide text-slate-400">Octants</div>
+        <div className="text-[11px] tracking-wide text-slate-400">Octants</div>
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
@@ -50,7 +50,7 @@ export function GeometryControls({
             }`}
             onClick={() => onHighlightPositiveOctantChange(!highlightPositiveOctant)}
           >
-            Log Returns +++
+            Log Returns (+)
           </button>
           <button
             type="button"
@@ -61,10 +61,9 @@ export function GeometryControls({
             }`}
             onClick={() => onHighlightNegativeOctantChange(!highlightNegativeOctant)}
           >
-            Log Returns ---
+            Log Returns (-)
           </button>
         </div>
-        <div className="text-[10px] text-slate-500">Highlights only visible events (t &lt;= playhead).</div>
       </div>
     </div>
   );

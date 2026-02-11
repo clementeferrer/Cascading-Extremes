@@ -39,7 +39,7 @@ export function VerticalEventTimeline({ items, currentTime, timeScale, onHover, 
             >
               <div className="flex items-center justify-between">
                 <div className="text-[11px] text-slate-400">t = {(item.t * timeScale).toFixed(2)}h</div>
-                <div className="text-[11px] text-slate-400">POC {item.ratio.toFixed(2)}</div>
+                <div className="text-[11px] text-slate-400">POP {item.ratio.toFixed(2)}</div>
               </div>
               <div className="mt-1 text-sm font-semibold text-white">{item.asset}</div>
               <div className="text-[11px] text-slate-400">{item.context}</div>

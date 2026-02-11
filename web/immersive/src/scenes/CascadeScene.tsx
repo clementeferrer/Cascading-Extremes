@@ -1,5 +1,5 @@
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Text } from "@react-three/drei";
+import { Line, OrbitControls, Text } from "@react-three/drei";
 import { CubeFrame } from "./CubeFrame";
 import { SimplexPlane } from "./SimplexPlane";
 import { EventsPoints, EventPoint } from "./EventsPoints";
@@ -28,6 +28,16 @@ const AXIS_LABEL_POSITIONS: [number, number, number][] = [
 ];
 
 const ASSET_COLORS = ["#38bdf8", "#f97316", "#22c55e"];
+
+function NegativeAxes({ size = 1.2 }: { size?: number }) {
+  return (
+    <>
+      <Line points={[[-size, 0, 0], [0, 0, 0]]} color="#ff4d4d" transparent opacity={0.7} />
+      <Line points={[[0, -size, 0], [0, 0, 0]]} color="#5bff5b" transparent opacity={0.7} />
+      <Line points={[[0, 0, -size], [0, 0, 0]]} color="#5b8bff" transparent opacity={0.7} />
+    </>
+  );
+}
 
 function AxisLabels({ labels }: { labels: string[] }) {
   return (
@@ -74,6 +84,7 @@ export function CascadeScene({
       <directionalLight position={[2.5, 2.5, 2]} intensity={1.1} />
       <CubeFrame />
       <axesHelper args={[1.2]} />
+      <NegativeAxes size={1.2} />
       {showSimplex && <SimplexPlane />}
       {assetLabels && assetLabels.length >= 3 && <AxisLabels labels={assetLabels} />}
       {bulkPoints && bulkPoints.length > 0 && <BulkPoints positions={bulkPoints} visible={showBulk ?? false} />}

@@ -112,7 +112,7 @@ export function EventRail({ items, currentTime, onHover, onSelect, timeScale }: 
                       {item.assetKey}
                     </div>
 
-                    {/* POC bar */}
+                    {/* POP bar */}
                     <div className="mt-1 h-1 w-full rounded-full bg-white/10 overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-300"
@@ -126,7 +126,7 @@ export function EventRail({ items, currentTime, onHover, onSelect, timeScale }: 
 
                     {/* Probability value */}
                     <div className="mt-0.5 text-[8px] text-slate-400 text-center">
-                      POC = {item.ratio.toFixed(2)}
+                      POP = {item.ratio.toFixed(2)}
                     </div>
 
                     {/* Time */}
