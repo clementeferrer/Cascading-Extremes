@@ -29,6 +29,17 @@ function downsamplePairs(data: [number, number][], maxPoints = 2500): [number, n
   return out;
 }
 
+function formatUtcDate(startIso: string | null | undefined, hourIndex: number, detailed = false): string {
+  if (!startIso) return `t = ${Math.round(hourIndex)}h`;
+  const startMs = Date.parse(startIso);
+  if (!Number.isFinite(startMs)) return `t = ${Math.round(hourIndex)}h`;
+  const dt = new Date(startMs + Math.round(hourIndex) * 3600_000);
+  if (detailed) {
+    return dt.toISOString().replace("T", " ").slice(0, 16) + " UTC";
+  }
+  return dt.toISOString().slice(5, 16).replace("T", " ");
+}
+
 export function ReturnsTracksPanel({ data, currentTime, loading = false, error = null }: Props) {
   const option = useMemo(() => {
     if (!data || !data.assets.length) {
@@ -46,7 +57,7 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
     const grid = assets.map((_, idx) => ({
       left: 58,
       right: 20,
-      top: `${12 + idx * 29}%`,
+      top: `${14 + idx * 28}%`,
       height: "20%",
     }));
 
@@ -61,13 +72,14 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
         show: idx === assets.length - 1,
         color: "#94a3b8",
         fontSize: 10,
+        formatter: (v: number) => formatUtcDate(data.alignment.start_datetime_utc, v),
       },
       splitLine: { show: false },
       axisPointer: {
         show: true,
         lineStyle: { color: "rgba(226,232,240,0.35)", width: 1, type: "dashed" },
       },
-      name: idx === assets.length - 1 ? "Time Index (hours from first extreme)" : "",
+      name: idx === assets.length - 1 ? "Time (UTC, aligned to first extreme)" : "",
       nameLocation: "middle",
       nameGap: 30,
       nameTextStyle: { color: "#94a3b8", fontSize: 10 },
@@ -135,15 +147,15 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
         xAxisIndex: idx,
         yAxisIndex: idx,
         data: extremes,
-        symbolSize: 6,
+        symbolSize: 5,
         animation: false,
         itemStyle: {
           color: "#fbbf24",
-          opacity: 0.82,
-          borderColor: "rgba(254,243,199,0.55)",
+          opacity: 0.74,
+          borderColor: "rgba(254,243,199,0.45)",
           borderWidth: 1,
-          shadowBlur: 3,
-          shadowColor: "rgba(251,191,36,0.16)",
+          shadowBlur: 1.5,
+          shadowColor: "rgba(251,191,36,0.10)",
         },
         z: 8,
       };
@@ -155,7 +167,7 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
       title: {
         text: "Asset Returns (% log-return)",
         left: 14,
-        top: 2,
+        top: 0,
         textStyle: { color: "#e2e8f0", fontSize: 12, fontWeight: 600 },
       },
       grid,
@@ -170,7 +182,15 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
         backgroundColor: "rgba(15,23,42,0.96)",
         borderColor: "rgba(148,163,184,0.25)",
         textStyle: { color: "#e2e8f0" },
-        valueFormatter: (v: number) => `${v.toFixed(3)}%`,
+        formatter: (params: any) => {
+          const items = Array.isArray(params) ? params : [params];
+          const axisValue = Number(items[0]?.axisValue ?? 0);
+          const header = `t = ${formatUtcDate(data.alignment.start_datetime_utc, axisValue, true)}`;
+          const rows = items
+            .filter((p: any) => p?.seriesType === "line")
+            .map((p: any) => `${p.marker}${p.seriesName}: ${Number(p.value?.[1] ?? p.value).toFixed(3)}%`);
+          return [header, ...rows].join("<br/>");
+        },
       },
       series: [...lineSeries, ...extremeSeries],
     };

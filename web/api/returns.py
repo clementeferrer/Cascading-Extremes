@@ -126,6 +126,7 @@ def get_returns_payload(run_id: str) -> Dict:
                 "method": "offset_estimated_max_abs_return",
                 "offset_hours": 0,
                 "candidate_count": 0,
+                "start_datetime_utc": None,
             },
             "count": 0,
         }
@@ -158,6 +159,7 @@ def get_returns_payload(run_id: str) -> Dict:
                 "method": "offset_estimated_max_abs_return",
                 "offset_hours": 0,
                 "candidate_count": 0,
+                "start_datetime_utc": None,
             },
             "count": 0,
         }
@@ -195,6 +197,7 @@ def get_returns_payload(run_id: str) -> Dict:
             "method": "offset_estimated_max_abs_return",
             "offset_hours": int(offset),
             "candidate_count": int(candidate_count),
+            "start_datetime_utc": pd.Timestamp(returns_df.index[offset]).isoformat(),
         },
         "count": int(len(event_pairs)),
     }

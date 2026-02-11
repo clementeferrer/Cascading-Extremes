@@ -53,6 +53,7 @@ export const RunReturnsResponse = z.object({
     method: z.string(),
     offset_hours: z.number(),
     candidate_count: z.number(),
+    start_datetime_utc: z.string().nullable().optional(),
   }),
   count: z.number().optional(),
 });
