@@ -33,7 +33,15 @@ def _compute_bulk() -> np.ndarray:
     )
 
     returns = compute_log_returns(prices)
-    residuals, _ = fit_garch(returns, dist=cfg["preprocess"].get("garch_dist", "t"))
+    try:
+        residuals, _ = fit_garch(returns, dist=cfg["preprocess"].get("garch_dist", "t"))
+    except ModuleNotFoundError as exc:
+        if exc.name == "arch":
+            raise RuntimeError(
+                "bulk_observations cache not found and optional dependency 'arch' "
+                "is unavailable. Precompute artifacts/phase2/bulk_observations.npz."
+            ) from exc
+        raise
     X, _ = standardize_laplace(residuals, pit_clip=cfg["preprocess"].get("pit_clip", 1e-6))
     X = X.dropna()
 

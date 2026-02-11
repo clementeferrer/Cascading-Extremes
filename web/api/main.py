@@ -75,6 +75,12 @@ def _dist_dir() -> Path:
     return Path(static_env) if static_env else ROOT_DIR / "web" / "immersive" / "dist"
 
 
+def _laplace_quantile(u: np.ndarray) -> np.ndarray:
+    """Inverse CDF of standard Laplace used by return-to-margin mapping."""
+    centered = u - 0.5
+    return -np.sign(centered) * np.log(np.maximum(1.0 - 2.0 * np.abs(centered), 1e-15))
+
+
 
 app = FastAPI(title="Cascading Extremes Immersive API")
 
@@ -244,7 +250,6 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
         raise HTTPException(status_code=500, detail="Phase 2 artifacts not found.")
 
     try:
-        from second_phase.preprocess import laplace_quantile
         from cascades.utils import EmpiricalCDF
 
         if req.seed is not None:
@@ -264,7 +269,7 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
             cdf = EmpiricalCDF(sorted_values=sorted_vals, eps=1e-6)
             r_decimal = req.returns[asset] / 100.0
             u = cdf.cdf(np.array([r_decimal]))[0]
-            x = laplace_quantile(np.array([u]))[0]
+            x = _laplace_quantile(np.array([u]))[0]
             X_vals.append(x)
 
         X = np.array(X_vals, dtype=np.float32)

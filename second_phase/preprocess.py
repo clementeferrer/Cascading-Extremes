@@ -4,13 +4,32 @@ Reuses GARCH fitting from cascades.preprocess, then applies PIT to Laplace
 margins instead of exponential margins.
 """
 
+from __future__ import annotations
+
 from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
 
-from cascades.preprocess import compute_log_returns, fit_garch  # noqa: F401
 from cascades.utils import EmpiricalCDF
+
+
+def compute_log_returns(prices: pd.DataFrame) -> pd.DataFrame:
+    """Forward to cascades.preprocess lazily.
+
+    This keeps module import lightweight so users of laplace_* utilities do not
+    require optional GARCH dependencies at import time.
+    """
+    from cascades.preprocess import compute_log_returns as _compute_log_returns
+
+    return _compute_log_returns(prices)
+
+
+def fit_garch(df: pd.DataFrame, dist: str = "t") -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Forward to cascades.preprocess lazily."""
+    from cascades.preprocess import fit_garch as _fit_garch
+
+    return _fit_garch(df, dist=dist)
 
 
 def laplace_quantile(u: np.ndarray) -> np.ndarray:
