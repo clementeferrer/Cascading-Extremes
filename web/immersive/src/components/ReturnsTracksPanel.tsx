@@ -181,13 +181,11 @@ export function ReturnsTracksPanel({
         const borderWidth = highlighted ? 1.1 : 1;
         const symbol = positiveActive ? "triangle" : negativeActive ? "diamond" : "circle";
         const symbolSize = highlighted ? 6 : 5;
-        const octantBadge = positiveActive ? "[+] Positive octant" : negativeActive ? "[-] Negative octant" : null;
         const opacity = positiveActive || negativeActive ? 0.78 : 0.56;
         return {
           value: [t, v],
           symbol,
           symbolSize,
-          octantBadge,
           itemStyle: {
             color,
             opacity,
@@ -212,6 +210,7 @@ export function ReturnsTracksPanel({
           borderWidth: 1,
           shadowBlur: 0,
         },
+        tooltip: { show: false },
         z: 8,
       };
     });
@@ -241,17 +240,25 @@ export function ReturnsTracksPanel({
           const items = Array.isArray(params) ? params : [params];
           const axisValue = Number(items[0]?.axisValue ?? 0);
           const header = `t = ${formatUtcDate(data.alignment.start_datetime_utc, axisValue, true)}`;
-          const lineRows = items
-            .filter((p: any) => p?.seriesType === "line")
-            .map((p: any) => `${p.marker}${p.seriesName}: ${Number(p.value?.[1] ?? p.value).toFixed(3)}%`);
-          const extremeRows = items
-            .filter((p: any) => p?.seriesType === "scatter")
-            .map((p: any) => {
-              const val = Number(Array.isArray(p.value) ? p.value[1] : p.value);
-              const badge = p?.data?.octantBadge ? ` ${p.data.octantBadge}` : "";
-              return `${p.marker}${p.seriesName}: ${val.toFixed(3)}%${badge}`;
-            });
-          return [header, ...lineRows, ...extremeRows].join("<br/>");
+          const lineByAsset = new Map<string, any>();
+          for (const p of items) {
+            if (p?.seriesType !== "line") continue;
+            const key = String(p?.seriesName ?? "").replace(/\s+Return$/i, "").trim().toUpperCase();
+            if (!key) continue;
+            if (!lineByAsset.has(key)) {
+              lineByAsset.set(key, p);
+            }
+          }
+          const lineRows = assets.map((asset) => {
+            const key = shortAsset(asset);
+            const color = ASSET_COLORS[key] ?? "#cbd5e1";
+            const marker = `<span style="display:inline-block;margin-right:6px;border-radius:9999px;width:8px;height:8px;background:${color};"></span>`;
+            const p = lineByAsset.get(key);
+            if (!p) return `${marker}${key} Return: --`;
+            const val = Number(Array.isArray(p.value) ? p.value[1] : p.value);
+            return `${marker}${key} Return: ${val.toFixed(3)}%`;
+          });
+          return [header, ...lineRows].join("<br/>");
         },
       },
       series: [...lineSeries, ...extremeSeries],
