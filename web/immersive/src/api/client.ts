@@ -33,7 +33,14 @@ export async function getMetrics(runId: string, offset = 0, limit = 10000): Prom
 export async function getRunReturns(runId: string): Promise<RunReturnsResponse> {
   const res = await fetch(`${API_URL}/runs/${runId}/returns`);
   if (!res.ok) {
-    throw new Error(`Returns fetch failed: ${res.status}`);
+    let detail = "";
+    try {
+      const body = await res.json();
+      detail = body?.detail ? ` (${body.detail})` : "";
+    } catch {
+      detail = "";
+    }
+    throw new Error(`Returns fetch failed: ${res.status}${detail}`);
   }
   const json = await res.json();
   return RunReturnsResponse.parse(json);
