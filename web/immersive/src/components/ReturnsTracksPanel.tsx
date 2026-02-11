@@ -176,19 +176,23 @@ export function ReturnsTracksPanel({
         const positiveActive = highlightPositiveOctant && isPositiveOctant;
         const negativeActive = highlightNegativeOctant && isNegativeOctant;
         const color = positiveActive ? "#14b8a6" : negativeActive ? "#fb7185" : "#fbbf24";
-        const borderColor = positiveActive
-          ? "rgba(153,246,228,0.52)"
-          : negativeActive
-            ? "rgba(254,205,211,0.52)"
-            : "rgba(254,243,199,0.36)";
+        const highlighted = positiveActive || negativeActive;
+        const borderColor = highlighted ? "rgba(241,245,249,0.9)" : "rgba(254,243,199,0.36)";
+        const borderWidth = highlighted ? 1.1 : 1;
+        const symbol = positiveActive ? "triangle" : negativeActive ? "diamond" : "circle";
+        const symbolSize = highlighted ? 6 : 5;
+        const octantBadge = positiveActive ? "[+] Positive octant" : negativeActive ? "[-] Negative octant" : null;
         const opacity = positiveActive || negativeActive ? 0.78 : 0.56;
         return {
           value: [t, v],
+          symbol,
+          symbolSize,
+          octantBadge,
           itemStyle: {
             color,
             opacity,
             borderColor,
-            borderWidth: 1,
+            borderWidth,
             shadowBlur: 0,
           },
         };
@@ -237,10 +241,17 @@ export function ReturnsTracksPanel({
           const items = Array.isArray(params) ? params : [params];
           const axisValue = Number(items[0]?.axisValue ?? 0);
           const header = `t = ${formatUtcDate(data.alignment.start_datetime_utc, axisValue, true)}`;
-          const rows = items
+          const lineRows = items
             .filter((p: any) => p?.seriesType === "line")
             .map((p: any) => `${p.marker}${p.seriesName}: ${Number(p.value?.[1] ?? p.value).toFixed(3)}%`);
-          return [header, ...rows].join("<br/>");
+          const extremeRows = items
+            .filter((p: any) => p?.seriesType === "scatter")
+            .map((p: any) => {
+              const val = Number(Array.isArray(p.value) ? p.value[1] : p.value);
+              const badge = p?.data?.octantBadge ? ` ${p.data.octantBadge}` : "";
+              return `${p.marker}${p.seriesName}: ${val.toFixed(3)}%${badge}`;
+            });
+          return [header, ...lineRows, ...extremeRows].join("<br/>");
         },
       },
       series: [...lineSeries, ...extremeSeries],
