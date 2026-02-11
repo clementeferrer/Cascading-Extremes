@@ -1,4 +1,4 @@
-import { EventRecord, MetricsRecord, RunMeta, RunsIndex } from "./types";
+import { EventRecord, MetricsRecord, RunMeta, RunReturnsResponse, RunsIndex } from "./types";
 
 const envUrl = import.meta.env.VITE_API_URL as string | undefined;
 const API_URL =
@@ -28,6 +28,15 @@ export async function getMetrics(runId: string, offset = 0, limit = 10000): Prom
   const res = await fetch(`${API_URL}/runs/${runId}/metrics?offset=${offset}&limit=${limit}`);
   const json = await res.json();
   return json.metrics.map((m: unknown) => MetricsRecord.parse(m));
+}
+
+export async function getRunReturns(runId: string): Promise<RunReturnsResponse> {
+  const res = await fetch(`${API_URL}/runs/${runId}/returns`);
+  if (!res.ok) {
+    throw new Error(`Returns fetch failed: ${res.status}`);
+  }
+  const json = await res.json();
+  return RunReturnsResponse.parse(json);
 }
 
 export async function getSummary(runId: string): Promise<Record<string, unknown>> {

@@ -41,6 +41,23 @@ export const RunsIndex = z.object({
   runs: z.array(z.record(z.any())),
 });
 
+const TimeValuePair = z.tuple([z.number(), z.number()]);
+
+export const RunReturnsResponse = z.object({
+  run_id: z.string(),
+  units: z.literal("log_return_pct"),
+  assets: z.array(z.string()),
+  series: z.record(z.array(TimeValuePair)),
+  extreme_points: z.record(z.array(TimeValuePair)),
+  alignment: z.object({
+    method: z.string(),
+    offset_hours: z.number(),
+    candidate_count: z.number(),
+  }),
+  count: z.number().optional(),
+});
+
 export type RunMeta = z.infer<typeof RunMeta>;
 export type EventRecord = z.infer<typeof EventRecord>;
 export type MetricsRecord = z.infer<typeof MetricsRecord>;
+export type RunReturnsResponse = z.infer<typeof RunReturnsResponse>;

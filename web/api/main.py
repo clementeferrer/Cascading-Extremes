@@ -43,6 +43,17 @@ except ModuleNotFoundError:
     except ModuleNotFoundError:
         HAS_BULK = False
 
+try:
+    from web.api.returns import ReturnsError, get_returns_payload
+    HAS_RETURNS = True
+except ModuleNotFoundError:
+    try:
+        from returns import ReturnsError, get_returns_payload  # type: ignore
+        HAS_RETURNS = True
+    except ModuleNotFoundError:
+        ReturnsError = Exception  # type: ignore[assignment]
+        HAS_RETURNS = False
+
 # Phase 2 generation (vMF + Ogata thinning on the sphere)
 try:
     from second_phase.simulate import load_model as load_model_p2, load_quantile_model as load_qmodel_p2, autoregressive_generate
@@ -139,6 +150,19 @@ def run_metrics(
             except Exception:
                 pass
     return {"metrics": records, "offset": offset, "limit": limit, "count": len(records)}
+
+
+@app.get("/runs/{run_id}/returns")
+def run_returns(run_id: str):
+    if not HAS_RETURNS:
+        raise HTTPException(status_code=500, detail="Returns computation not available.")
+    try:
+        return get_returns_payload(run_id)
+    except ReturnsError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as exc:
+        logger.exception("GET /runs/%s/returns failed", run_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/runs/{run_id}/summary")

@@ -5,9 +5,10 @@ import {
   getEvents,
   getMeta,
   getMetrics,
+  getRunReturns,
   getRuns,
 } from "../api/client";
-import { EventRecord, MetricsRecord, RunMeta } from "../api/types";
+import { EventRecord, MetricsRecord, RunMeta, RunReturnsResponse } from "../api/types";
 import { CascadeScene } from "../scenes/CascadeScene";
 import { KPICards } from "../components/KPICards";
 import { Sparklines } from "../components/Sparklines";
@@ -15,6 +16,7 @@ import { Controls } from "../components/Controls";
 import { GenerationControls } from "../components/GenerationControls";
 import { GeometryControls } from "../components/GeometryControls";
 import { EventRail } from "../components/EventRail";
+import { ReturnsTracksPanel } from "../components/ReturnsTracksPanel";
 import { useTimelineStore } from "../store/useTimelineStore";
 import { CubeMappingParams, mapToCube } from "../utils/geometry";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -54,6 +56,9 @@ export default function ViewerPage() {
   const [metrics, setMetrics] = useState<MetricsRecord[]>([]);
   const [timeScale, setTimeScale] = useState<number>(1);
   const [meta, setMeta] = useState<RunMeta | null>(null);
+  const [returnsData, setReturnsData] = useState<RunReturnsResponse | null>(null);
+  const [returnsLoading, setReturnsLoading] = useState<boolean>(false);
+  const [returnsError, setReturnsError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
 
   const [mode, setMode] = useState<"real" | "generative">("real");
@@ -120,6 +125,9 @@ export default function ViewerPage() {
     setEvents([]);
     setMetrics([]);
     setMeta(null);
+    setReturnsData(null);
+    setReturnsLoading(false);
+    setReturnsError(null);
     setPendingPlayRunId(null);
     setShowBulk(false);
 
@@ -153,11 +161,28 @@ export default function ViewerPage() {
     }
     console.info(`[RUN] loading: ${activeRun}`);
     (async () => {
+      const shouldLoadReturns = mode === "real";
+      if (shouldLoadReturns) {
+        setReturnsLoading(true);
+        setReturnsError(null);
+      } else {
+        setReturnsData(null);
+        setReturnsLoading(false);
+        setReturnsError(null);
+      }
+
       try {
-        const [metaResp, ev, mt] = await Promise.all([
+        const returnsPromise = shouldLoadReturns
+          ? getRunReturns(activeRun)
+              .then((payload) => ({ payload, error: null as string | null }))
+              .catch((err) => ({ payload: null, error: err instanceof Error ? err.message : "Unknown error" }))
+          : Promise.resolve({ payload: null, error: null as string | null });
+
+        const [metaResp, ev, mt, ret] = await Promise.all([
           getMeta(activeRun),
           getEvents(activeRun, 0, 200000),
           getMetrics(activeRun, 0, 200000),
+          returnsPromise,
         ]);
         console.info(`[DATA] events: ${ev.length}, metrics: ${mt.length}`);
         setMeta(metaResp);
@@ -181,12 +206,23 @@ export default function ViewerPage() {
         setTimeScale(scale);
         setEvents(evScaled);
         setMetrics(mtScaled);
+        if (!isGenerative && ret.payload) {
+          setReturnsData(ret.payload);
+          setReturnsError(null);
+        } else if (!isGenerative && ret.error) {
+          setReturnsData(null);
+          setReturnsError(`Returns panel unavailable (${ret.error}).`);
+        } else {
+          setReturnsData(null);
+          setReturnsError(null);
+        }
         const horizonClamp =
           isGenerative && generativeHorizon != null ? Math.min(maxTimeScaled, generativeHorizon) : maxTimeScaled;
         console.info(`[TIMELINE] maxT=${maxT.toFixed(2)}, scale=${scale.toFixed(4)}, horizon=${horizonClamp.toFixed(2)}, isGenerative=${isGenerative}`);
         setMaxTime(horizonClamp);
         setCurrentTime(0);
         setPlaying(false);
+        setReturnsLoading(false);
         if (metaResp?.assets?.length && !seedRunId) {
           setSeedRunId(activeRun);
         }
@@ -195,6 +231,9 @@ export default function ViewerPage() {
         setApiError("Failed to load run data. Ensure exports exist and API is running.");
         setEvents([]);
         setMetrics([]);
+        setReturnsData(null);
+        setReturnsError("Returns panel unavailable for this run.");
+        setReturnsLoading(false);
         setMaxTime(0);
       }
     })();
@@ -411,6 +450,7 @@ export default function ViewerPage() {
   };
 
   const playDisabled = mode === "real" ? events.length === 0 || maxTime <= 0 : generating;
+  const showReturnsPanel = mode === "real";
 
   return (
     <div className="h-screen overflow-hidden bg-night text-slate-100 relative">
@@ -474,17 +514,43 @@ export default function ViewerPage() {
           </div>
 
           <div className="relative h-full overflow-hidden rounded-3xl border border-white/10 bg-night shadow-2xl">
-            <CascadeScene
-              events={eventPoints}
-              currentTime={currentTime}
-              mapping={mapping}
-              showSimplex={showSimplex}
-              pointSize={pointSizeValue}
-              highlightPoint={highlightPoint}
-              assetLabels={meta?.assets ?? runs.find((r) => r.run_id === realRunId)?.assets}
-              bulkPoints={bulkPoints}
-              showBulk={showBulk}
-            />
+            {showReturnsPanel ? (
+              <div className="grid h-full min-h-0 grid-rows-[72fr_28fr] gap-2 p-2">
+                <div className="relative min-h-0 overflow-hidden rounded-2xl border border-white/10 bg-night">
+                  <CascadeScene
+                    events={eventPoints}
+                    currentTime={currentTime}
+                    mapping={mapping}
+                    showSimplex={showSimplex}
+                    pointSize={pointSizeValue}
+                    highlightPoint={highlightPoint}
+                    assetLabels={meta?.assets ?? runs.find((r) => r.run_id === realRunId)?.assets}
+                    bulkPoints={bulkPoints}
+                    showBulk={showBulk}
+                  />
+                </div>
+                <div className="min-h-0">
+                  <ReturnsTracksPanel
+                    data={returnsData}
+                    currentTime={displayTime}
+                    loading={returnsLoading}
+                    error={returnsError}
+                  />
+                </div>
+              </div>
+            ) : (
+              <CascadeScene
+                events={eventPoints}
+                currentTime={currentTime}
+                mapping={mapping}
+                showSimplex={showSimplex}
+                pointSize={pointSizeValue}
+                highlightPoint={highlightPoint}
+                assetLabels={meta?.assets ?? runs.find((r) => r.run_id === realRunId)?.assets}
+                bulkPoints={bulkPoints}
+                showBulk={showBulk}
+              />
+            )}
           </div>
 
           <div className="h-full w-full flex-none shrink-0">
