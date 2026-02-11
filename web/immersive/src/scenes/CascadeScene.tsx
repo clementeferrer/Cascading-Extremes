@@ -28,13 +28,14 @@ const AXIS_LABEL_POSITIONS: [number, number, number][] = [
 ];
 
 const ASSET_COLORS = ["#38bdf8", "#f97316", "#22c55e"];
+const AXIS_COLOR = "#94a3b8";
 
-function NegativeAxes({ size = 1.2 }: { size?: number }) {
+function CoordinateAxes({ size = 1.2 }: { size?: number }) {
   return (
     <>
-      <Line points={[[-size, 0, 0], [0, 0, 0]]} color="#ff4d4d" transparent opacity={0.7} />
-      <Line points={[[0, -size, 0], [0, 0, 0]]} color="#5bff5b" transparent opacity={0.7} />
-      <Line points={[[0, 0, -size], [0, 0, 0]]} color="#5b8bff" transparent opacity={0.7} />
+      <Line points={[[-size, 0, 0], [size, 0, 0]]} color={AXIS_COLOR} transparent opacity={0.7} />
+      <Line points={[[0, -size, 0], [0, size, 0]]} color={AXIS_COLOR} transparent opacity={0.7} />
+      <Line points={[[0, 0, -size], [0, 0, size]]} color={AXIS_COLOR} transparent opacity={0.7} />
     </>
   );
 }
@@ -83,8 +84,7 @@ export function CascadeScene({
       <ambientLight intensity={0.5} />
       <directionalLight position={[2.5, 2.5, 2]} intensity={1.1} />
       <CubeFrame />
-      <axesHelper args={[1.2]} />
-      <NegativeAxes size={1.2} />
+      <CoordinateAxes size={1.2} />
       {showSimplex && <SimplexPlane />}
       {assetLabels && assetLabels.length >= 3 && <AxisLabels labels={assetLabels} />}
       {bulkPoints && bulkPoints.length > 0 && <BulkPoints positions={bulkPoints} visible={showBulk ?? false} />}
