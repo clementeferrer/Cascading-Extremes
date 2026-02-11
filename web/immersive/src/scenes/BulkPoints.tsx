@@ -8,7 +8,7 @@ interface Props {
   pointSize?: number;
 }
 
-const TARGET_OPACITY = 0.15;
+const TARGET_OPACITY = 0.28;
 const FADE_SPEED = 0.7; // opacity units per second
 
 export function BulkPoints({ positions, visible, pointSize = 0.025 }: Props) {

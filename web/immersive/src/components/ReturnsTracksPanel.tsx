@@ -46,7 +46,7 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
     const grid = assets.map((_, idx) => ({
       left: 58,
       right: 20,
-      top: `${8 + idx * 30}%`,
+      top: `${12 + idx * 29}%`,
       height: "20%",
     }));
 
@@ -139,10 +139,11 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
         animation: false,
         itemStyle: {
           color: "#fbbf24",
-          borderColor: "rgba(254,243,199,0.85)",
+          opacity: 0.82,
+          borderColor: "rgba(254,243,199,0.55)",
           borderWidth: 1,
-          shadowBlur: 8,
-          shadowColor: "rgba(251,191,36,0.35)",
+          shadowBlur: 3,
+          shadowColor: "rgba(251,191,36,0.16)",
         },
         z: 8,
       };
@@ -154,7 +155,7 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
       title: {
         text: "Asset Returns (% log-return)",
         left: 14,
-        top: 8,
+        top: 2,
         textStyle: { color: "#e2e8f0", fontSize: 12, fontWeight: 600 },
       },
       grid,
