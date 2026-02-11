@@ -76,7 +76,7 @@ export function CascadeScene({
 }: Props) {
   return (
     <Canvas
-      camera={{ position: [3.2, 2.4, 3.2], fov: 42 }}
+      camera={{ position: [2.55, 2.95, 1.95], fov: 41 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#0b1020"]} />
@@ -102,7 +102,13 @@ export function CascadeScene({
           <meshStandardMaterial color="#e76f51" emissive="#e76f51" emissiveIntensity={0.8} />
         </mesh>
       )}
-      <OrbitControls enablePan={false} enableZoom={true} enableRotate={true} target={[0, 0, 0]} />
+      <OrbitControls
+        enablePan={false}
+        enableZoom
+        enableRotate
+        target={[0, 0.03, 0]}
+        maxPolarAngle={1.52}
+      />
     </Canvas>
   );
 }

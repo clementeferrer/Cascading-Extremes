@@ -42,6 +42,19 @@ export function Sparklines({ series, currentTime, timeScale, startDatetimeUtc = 
       trigger: "axis",
       backgroundColor: "rgba(15,23,42,0.9)",
       textStyle: { color: "#e2e8f0" },
+      confine: true,
+      position: (point: number[], _params: any, _dom: any, _rect: any, size: any) => {
+        const [viewWidth, viewHeight] = size?.viewSize ?? [0, 0];
+        const [contentWidth, contentHeight] = size?.contentSize ?? [0, 0];
+        const gap = 10;
+        let x = (point?.[0] ?? 0) + gap;
+        let y = (point?.[1] ?? 0) - contentHeight / 2;
+        if (x + contentWidth > viewWidth - 4) x = viewWidth - contentWidth - 4;
+        if (x < 4) x = 4;
+        if (y + contentHeight > viewHeight - 4) y = viewHeight - contentHeight - 4;
+        if (y < 4) y = 4;
+        return [x, y];
+      },
       formatter: (params: any) => {
         const items = Array.isArray(params) ? params : [params];
         if (!items.length) return "";
