@@ -17,8 +17,6 @@ export function SimplexPlane() {
           wireframe
         />
       </mesh>
-      {/* Axis lines through origin for reference */}
-      <axesHelper args={[1.2]} />
     </group>
   );
 }

@@ -12,10 +12,8 @@ interface Props {
   displayTime: number;
   displayMaxTime: number;
   eventCount: number;
-  meanMag?: number;
   lambda?: number;
   psi?: number;
-  assetCounts?: Record<string, number>;
   sparkSeries: { name: string; color: string; data: [number, number][] }[];
   ratioSeries: [number, number][];
   assetProbSeries: [number, number, number][];
@@ -46,10 +44,8 @@ export function Overlay({
   displayTime,
   displayMaxTime,
   eventCount,
-  meanMag,
   lambda,
   psi,
-  assetCounts,
   sparkSeries,
   ratioSeries,
   assetProbSeries,
@@ -97,10 +93,8 @@ export function Overlay({
         <KPICards
           currentTime={displayTime}
           eventCount={eventCount}
-          meanMag={meanMag}
           lambda={lambda}
           psi={psi}
-          assetCounts={assetCounts}
         />
       </div>
 

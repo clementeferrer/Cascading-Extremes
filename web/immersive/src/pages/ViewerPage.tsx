@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  generateContinue,
+  generateFromReturns,
+  getBulk,
   getEvents,
   getMeta,
   getMetrics,
@@ -57,17 +58,19 @@ export default function ViewerPage() {
 
   const [mode, setMode] = useState<"real" | "generative">("real");
   const [seedRunId, setSeedRunId] = useState<string>("");
-  const [seedAsset, setSeedAsset] = useState<string>("BTC-USD");
-  const [theta, setTheta] = useState<number>(0);
-  const [phi, setPhi] = useState<number>(Math.PI / 2);
-  const [magnitude, setMagnitude] = useState<number>(3.0);
+  const [returns, setReturns] = useState<Record<string, number>>({
+    "BTC-USD": -5.0,
+    "ETH-USD": -3.0,
+    "BNB-USD": -1.0,
+  });
   const [horizonHours, setHorizonHours] = useState<number>(240);
   const [generativeHorizon, setGenerativeHorizon] = useState<number | null>(null);
   const [generating, setGenerating] = useState<boolean>(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [pendingPlayRunId, setPendingPlayRunId] = useState<string | null>(null);
   const [generativeRunReady, setGenerativeRunReady] = useState<boolean>(false);
 
-  const [showSimplex, setShowSimplex] = useState<boolean>(true);
+  const [showSimplex, setShowSimplex] = useState<boolean>(false);
   const [pointSize, setPointSize] = useState<"small" | "medium" | "large">("small");
   const [mapping, setMapping] = useState<CubeMappingParams>({
     a: 3.0,
@@ -75,6 +78,8 @@ export default function ViewerPage() {
     offsetScale: 0.3,
   });
   const [hoveredEventId, setHoveredEventId] = useState<number | null>(null);
+  const [bulkPoints, setBulkPoints] = useState<[number, number, number][]>([]);
+  const [showBulk, setShowBulk] = useState<boolean>(false);
 
   const { currentTime, maxTime, playing, speed, setCurrentTime, setMaxTime, setPlaying } = useTimelineStore();
 
@@ -98,6 +103,13 @@ export default function ViewerPage() {
       });
   }, []);
 
+  // Fetch bulk observations once on mount
+  useEffect(() => {
+    getBulk()
+      .then((data) => setBulkPoints(data.points))
+      .catch(() => console.warn("Bulk observations not available"));
+  }, []);
+
   // Mode switch effect - CRITICAL: stops playback and resets state cleanly
   useEffect(() => {
     console.info(`[MODE] switching to: ${mode}`);
@@ -109,6 +121,7 @@ export default function ViewerPage() {
     setMetrics([]);
     setMeta(null);
     setPendingPlayRunId(null);
+    setShowBulk(false);
 
     if (mode === "real") {
       // Clear generative state when switching TO real mode
@@ -177,10 +190,6 @@ export default function ViewerPage() {
         if (metaResp?.assets?.length && !seedRunId) {
           setSeedRunId(activeRun);
         }
-        if (metaResp?.assets?.length) {
-          setSeedAsset(metaResp.assets[0]);
-        }
-        // magnitude range no longer needed — generation uses theta/phi directly
       } catch (err) {
         console.error(err);
         setApiError("Failed to load run data. Ensure exports exist and API is running.");
@@ -200,14 +209,6 @@ export default function ViewerPage() {
       }
     }
   }, [runs, seedRunId]);
-
-  useEffect(() => {
-    if (seedAsset) return;
-    const assets = runs.find((r) => r.run_id === realRunId)?.assets;
-    if (assets && assets.length) {
-      setSeedAsset(assets[0]);
-    }
-  }, [runs, realRunId, seedAsset]);
 
   useEffect(() => {
     console.info(`[viewer] mode -> ${mode}`);
@@ -234,6 +235,7 @@ export default function ViewerPage() {
         const next = t + dt * speed;
         if (next >= maxTime) {
           setPlaying(false);
+          setShowBulk(true);
           return maxTime;
         }
         return next;
@@ -251,8 +253,6 @@ export default function ViewerPage() {
   const metricIdx = metrics.length ? Math.min(metrics.length - 1, idx) : 0;
   const lambda = metrics.length ? metrics[metricIdx].lambda ?? undefined : undefined;
   const psi = metrics.length ? metrics[metricIdx].psi ?? undefined : undefined;
-  const assetCounts = metrics.length ? metrics[metricIdx].per_asset_counts ?? undefined : undefined;
-
   const displayTime = currentTime * timeScale;
 
   const metricTimes = metrics.map((m) => m.t ?? 0);
@@ -333,39 +333,47 @@ export default function ViewerPage() {
       .map((r) => ({ id: r.run_id, label: r.run_id }));
   }, [runs]);
 
+  const handleReturnsChange = (asset: string, value: number) => {
+    setReturns((prev) => ({ ...prev, [asset]: value }));
+    setGenerateError(null);
+  };
+
   const handleGenerate = async (autoPlay: boolean) => {
     if (generating) return;
     setGenerating(true);
+    setGenerateError(null);
     setPlaying(false);
     setCurrentTime(0);
     setMaxTime(0);
     setEvents([]);
     setMetrics([]);
+    setShowBulk(false);
     try {
       const seed = Math.floor(Math.random() * 2147483647);
-      console.info("[GENERATE] START", { seedAsset, theta, phi, magnitude, horizonHours, seed });
-      const payload = {
-        theta,
-        phi,
-        magnitude,
+      console.info("[GENERATE] START", { returns, horizonHours, seed });
+      const res = await generateFromReturns({
+        returns,
         max_time: horizonHours,
         seed,
-      };
-      const res = await generateContinue(payload);
+      });
+      if (!res.extreme) {
+        setGenerateError(res.message ?? "Not extreme enough to trigger a cascade.");
+        console.info("[GENERATE] NOT EXTREME", res);
+        return;
+      }
       const updatedRuns = await getRuns();
       setRuns(updatedRuns);
-      setGenerativeRunId(res.run_id);
+      setGenerativeRunId(res.run_id!);
       setGenerativeHorizon(horizonHours);
-      // Mark generative run as ready BEFORE setting activeRun
-      // This allows the fetch effect to proceed
       setGenerativeRunReady(true);
-      setActiveRun(res.run_id);
+      setActiveRun(res.run_id!);
       if (autoPlay) {
-        setPendingPlayRunId(res.run_id);
+        setPendingPlayRunId(res.run_id!);
       }
       console.info(`[GENERATE] END -> ${res.run_id}`);
     } catch (err) {
       console.error(err);
+      setGenerateError("Generation failed. Check the API server.");
       console.info("[GENERATE] FAILED");
     } finally {
       setGenerating(false);
@@ -434,7 +442,6 @@ export default function ViewerPage() {
               eventCount={eventCount}
               lambda={lambda}
               psi={psi}
-              assetCounts={assetCounts}
             />
             <Sparklines series={sparkSeries} currentTime={currentTime} />
             <GeometryControls
@@ -445,32 +452,21 @@ export default function ViewerPage() {
             />
             <GenerationControls
               mode={mode}
-              seedAsset={seedAsset}
-              assetOptions={
-                (meta?.assets ?? runs.find((r) => r.run_id === realRunId)?.assets ?? []).map((a) => ({
-                  id: a,
-                  label: a,
-                }))
-              }
-                theta={theta}
-                phi={phi}
-                magnitude={magnitude}
-                horizon={horizonHours}
-                generating={generating}
-                onModeChange={setMode}
-                onSeedAssetChange={setSeedAsset}
-                onThetaChange={setTheta}
-                onPhiChange={setPhi}
-                onMagnitudeChange={setMagnitude}
-                onHorizonChange={setHorizonHours}
-                onGenerate={() => handleGenerate(true)}
-                viewRunId={realRunId}
-                viewOptions={viewOptions}
-                onViewRunChange={(id) => {
-                  setRealRunId(id);
-                  if (mode === "real") setActiveRun(id);
-                }}
-              />
+              returns={returns}
+              horizon={horizonHours}
+              generating={generating}
+              generateError={generateError}
+              onModeChange={setMode}
+              onReturnsChange={handleReturnsChange}
+              onHorizonChange={setHorizonHours}
+              onGenerate={() => handleGenerate(true)}
+              viewRunId={realRunId}
+              viewOptions={viewOptions}
+              onViewRunChange={(id) => {
+                setRealRunId(id);
+                if (mode === "real") setActiveRun(id);
+              }}
+            />
             <div className="mt-auto">
               <Controls maxTime={maxTime} onPlay={handlePlay} disabled={playDisabled} />
               <div className="mt-2 text-[10px] text-slate-500">
@@ -488,6 +484,8 @@ export default function ViewerPage() {
               pointSize={pointSizeValue}
               highlightPoint={highlightPoint}
               assetLabels={meta?.assets ?? runs.find((r) => r.run_id === realRunId)?.assets}
+              bulkPoints={bulkPoints}
+              showBulk={showBulk}
             />
           </div>
 

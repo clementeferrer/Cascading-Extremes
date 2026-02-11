@@ -3,6 +3,7 @@ import { OrbitControls, Text } from "@react-three/drei";
 import { CubeFrame } from "./CubeFrame";
 import { SimplexPlane } from "./SimplexPlane";
 import { EventsPoints, EventPoint } from "./EventsPoints";
+import { BulkPoints } from "./BulkPoints";
 import { CubeMappingParams } from "../utils/geometry";
 
 interface Props {
@@ -13,6 +14,8 @@ interface Props {
   pointSize: number;
   highlightPoint?: [number, number, number] | null;
   assetLabels?: string[];
+  bulkPoints?: [number, number, number][];
+  showBulk?: boolean;
 }
 
 // Asset labels placed on each positive axis of the unit sphere
@@ -45,7 +48,7 @@ function AxisLabels({ labels }: { labels: string[] }) {
   );
 }
 
-export function CascadeScene({ events, currentTime, mapping, showSimplex, pointSize, highlightPoint, assetLabels }: Props) {
+export function CascadeScene({ events, currentTime, mapping, showSimplex, pointSize, highlightPoint, assetLabels, bulkPoints, showBulk }: Props) {
   return (
     <Canvas
       camera={{ position: [3.2, 2.4, 3.2], fov: 42 }}
@@ -56,8 +59,10 @@ export function CascadeScene({ events, currentTime, mapping, showSimplex, pointS
       <ambientLight intensity={0.5} />
       <directionalLight position={[2.5, 2.5, 2]} intensity={1.1} />
       <CubeFrame />
+      <axesHelper args={[1.2]} />
       {showSimplex && <SimplexPlane />}
       {assetLabels && assetLabels.length >= 3 && <AxisLabels labels={assetLabels} />}
+      {bulkPoints && bulkPoints.length > 0 && <BulkPoints positions={bulkPoints} visible={showBulk ?? false} />}
       <EventsPoints events={events} currentTime={currentTime} mapping={mapping} pointSize={pointSize} />
       {highlightPoint && (
         <mesh position={highlightPoint}>

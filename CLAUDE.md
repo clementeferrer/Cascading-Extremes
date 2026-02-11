@@ -194,7 +194,7 @@ where:
 
 When POC is high, the event was likely triggered by previous events (a cascade). When low, it's an exogenous shock.
 
-**Visualization:** The immersive viewer colors points by POC (viridis scale: blue=exogenous, yellow=cascade).
+**Visualization:** The immersive viewer colors extreme points in solid red. When playback reaches the end, all non-extreme observations fade in as a subtle gray point cloud, showing the full data shape.
 
 ---
 
@@ -222,18 +222,31 @@ The web viewer displays 390 extreme events (from 17,520 hourly observations over
 
 - Points are positioned at `R * W` — the raw radial-angular coordinates
 - Since events are exceedances (`R > u_tau(W)` by definition), most points appear **outside** the unit sphere
-- A wireframe unit sphere shows the threshold boundary — the geometric reference
-- Axes helpers show the three asset directions
-- Points colored by POC (viridis: blue=exogenous, yellow=cascade)
+- A wireframe unit sphere (toggled via "Show sphere", **off by default**) shows the threshold boundary — the geometric reference
+- Coordinate axes are always visible, independent of the sphere toggle
+- Extreme points are colored **solid red**; when playback reaches the end, all ~17,500 non-extreme observations fade in as a subtle gray point cloud (`BulkPoints`)
 - Camera orbits around origin with zoom controls
 
 The **POC** (Probability of Cascade) is `psi/lambda` — the ratio of endogenous to total Hawkes intensity. With `tau_min=1.0` hour, the trained model yields POC ~ 0.20 on real data, meaning ~20% of extreme events are cascade-driven. The Hawkes kernel has a learned decay timescale of ~1.77 hours, so events within 1-5 hours of each other contribute meaningfully to self-excitation.
 
-Generation in the viewer uses the Phase 2 model via **autoregressive sampling** (LLM-style). The user selects an asset (BTC/ETH/BNB), adjusts the direction via spherical coordinates (theta, phi), sets a magnitude R, and sets a time horizon. The Transformer then generates the cascade event by event, stopping only when time exceeds the horizon.
+### Return-Based Generative Input
+
+Generation in the viewer uses the Phase 2 model via **autoregressive sampling** (LLM-style). The user enters **percentage returns** for each asset (BTC-USD, ETH-USD, BNB-USD) in a 3-row input matrix. The backend converts these returns to Laplace margins via `POST /generate/from-returns`:
+
+1. Load empirical CDFs from `artifacts/phase2/cdfs.npz` (sorted GARCH residuals per asset)
+2. Convert `%` returns to decimal: `r = pct / 100`
+3. Apply PIT: `u = EmpiricalCDF(sorted_vals).cdf(r)`, then Laplace: `X = laplace_quantile(u)`, then normalize: `X /= log(n/2)`
+4. Compute `R = ||X||_2`, `W = X / R`
+5. Check extremality: `R > u_tau(W)` using the quantile model
+6. If not extreme → return error message; if extreme → run `autoregressive_generate(W, R, max_time, model, q_model)`
+
+### Bulk Observations
+
+The `GET /bulk` endpoint (`web/api/bulk.py`) computes and caches `R * W` positions for ALL ~17,500 observations (not just the 390 extremes). When playback reaches the end, these points are rendered as a subtle gray cloud via the `BulkPoints` component, showing the full data shape without overwhelming the extremes.
 
 The export pipeline (`cascades/viz_export/export.py`) loads real events from `data/processed_phase2/events.npz` (Phase 2: Laplace margins, L2 norm), uses the Phase 2 `SphericalQuantileMLP` for `u_tau(W)`, and the `SphericalCascadeTransformer` for intensity (lambda, psi) — for **both real and generative** data. It prefers Phase 2 artifacts from `artifacts/phase2/` and falls back to Phase 1 if unavailable. When multiple real runs exist, the viewer loads the **most recent** one (by index order).
 
-**Implementation:** See `web/immersive/src/scenes/`, `web/api/main.py`, and `cascades/viz_export/export.py`.
+**Implementation:** See `web/immersive/src/scenes/`, `web/api/main.py`, `web/api/bulk.py`, and `cascades/viz_export/export.py`.
 
 ---
 
@@ -263,16 +276,18 @@ second_phase/
 
 web/
 ├── api/
-│   ├── main.py       # FastAPI backend (Phase 2 autoregressive generation)
+│   ├── main.py       # FastAPI backend (Phase 2 generation, /generate/from-returns, /bulk)
+│   ├── bulk.py       # Bulk observation computation + caching for all ~17.5K points
 │   ├── storage.py    # Run storage (parquet I/O)
 │   └── metrics.py    # Summary metrics
 └── immersive/        # React + Three.js visualization
     └── src/
         ├── pages/ViewerPage.tsx      # Main viewer component
-        ├── scenes/CascadeScene.tsx   # 3D scene with sphere + cube
+        ├── scenes/CascadeScene.tsx   # 3D scene with sphere + cube + bulk points
         ├── scenes/SimplexPlane.tsx   # Wireframe unit sphere overlay
         ├── scenes/CubeFrame.tsx      # [-1.5, 1.5]^3 wireframe cube
-        └── scenes/EventsPoints.tsx   # Point cloud colored by POC (psi/lambda)
+        ├── scenes/EventsPoints.tsx   # Extreme event point cloud (solid red)
+        └── scenes/BulkPoints.tsx     # Non-extreme observation cloud (subtle gray, fade-in)
 
 configs/
 ├── default.yaml      # Phase 1 config

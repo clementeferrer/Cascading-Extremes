@@ -33,6 +33,16 @@ try:
 except ModuleNotFoundError:
     HAS_CASCADES = False
 
+try:
+    from web.api.bulk import get_bulk_positions
+    HAS_BULK = True
+except ModuleNotFoundError:
+    try:
+        from bulk import get_bulk_positions  # type: ignore
+        HAS_BULK = True
+    except ModuleNotFoundError:
+        HAS_BULK = False
+
 # Phase 2 generation (vMF + Ogata thinning on the sphere)
 try:
     from second_phase.simulate import load_model as load_model_p2, load_quantile_model as load_qmodel_p2, autoregressive_generate
@@ -142,6 +152,18 @@ def run_download(run_id: str, file: str):
     return FileResponse(path)
 
 
+@app.get("/bulk")
+def bulk_observations():
+    if not HAS_BULK:
+        raise HTTPException(status_code=500, detail="Bulk computation not available.")
+    try:
+        positions = get_bulk_positions()
+        return {"points": positions.tolist(), "count": len(positions)}
+    except Exception as exc:
+        logger.exception("GET /bulk failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 class GenerateRequest(BaseModel):
     theta: float = 0.0            # Azimuthal angle theta in [0, 2*pi]
     phi: float = 1.5708           # Polar angle phi in [0, pi], default pi/2 (BTC axis)
@@ -202,6 +224,93 @@ def generate_continue(req: GenerateRequest):
     cfg_path = _resolve_config_path(req.config)
     export_run_from_arrays(str(cfg_path), run_id, "generative", sim, output_dir=str(RUNS_DIR))
     return {"run_id": run_id}
+
+
+class GenerateFromReturnsRequest(BaseModel):
+    returns: dict[str, float]  # e.g. {"BTC-USD": -5.0, "ETH-USD": -3.0, "BNB-USD": -1.0}
+    max_time: float = 240.0
+    seed: Optional[int] = None
+
+
+@app.post("/generate/from-returns")
+def generate_from_returns(req: GenerateFromReturnsRequest):
+    if not HAS_PHASE2:
+        raise HTTPException(status_code=500, detail="Phase 2 model required for generation.")
+
+    cdfs_path = ARTIFACTS_DIR / "phase2" / "cdfs.npz"
+    p2_model_path = ARTIFACTS_DIR / "phase2" / "model.pt"
+    p2_q_path = ARTIFACTS_DIR / "phase2" / "quantile_model.pt"
+    if not cdfs_path.exists() or not p2_model_path.exists() or not p2_q_path.exists():
+        raise HTTPException(status_code=500, detail="Phase 2 artifacts not found.")
+
+    try:
+        from second_phase.preprocess import laplace_quantile
+        from cascades.utils import EmpiricalCDF
+
+        if req.seed is not None:
+            random.seed(req.seed)
+            np.random.seed(req.seed)
+
+        # Load CDFs
+        cdf_data = np.load(str(cdfs_path))
+        asset_order = sorted(req.returns.keys())
+
+        # Convert % returns to Laplace margins
+        X_vals = []
+        for asset in asset_order:
+            if asset not in cdf_data:
+                raise HTTPException(status_code=400, detail=f"Unknown asset: {asset}")
+            sorted_vals = cdf_data[asset]
+            cdf = EmpiricalCDF(sorted_values=sorted_vals, eps=1e-6)
+            r_decimal = req.returns[asset] / 100.0
+            u = cdf.cdf(np.array([r_decimal]))[0]
+            x = laplace_quantile(np.array([u]))[0]
+            X_vals.append(x)
+
+        X = np.array(X_vals, dtype=np.float32)
+        # Normalize by log(n/2)
+        n = max(len(cdf_data[asset_order[0]]), 2)
+        X = X / np.log(n / 2)
+
+        # Compute R, W
+        R = float(np.linalg.norm(X))
+        if R < 1e-8:
+            return {"extreme": False, "R": R, "threshold": 0.0,
+                    "message": "Returns too close to zero to form a direction."}
+        W = X / R
+
+        # Load quantile model and check threshold
+        cfg_path = _resolve_config_path("configs/phase2.yaml")
+        cfg = load_config(str(cfg_path))
+        model = load_model_p2(str(p2_model_path))
+        model.to("cpu")
+        model.eval()
+        q_cfg = QCfgP2(**cfg["extremes"]["quantile_model"])
+        q_model = load_qmodel_p2(str(p2_q_path), model.d_assets, q_cfg)
+        q_model.to("cpu")
+        q_model.eval()
+
+        u_tau = q_model(torch.tensor(W[None, :], dtype=torch.float32)).item()
+
+        if R <= u_tau:
+            return {
+                "extreme": False,
+                "R": round(R, 4),
+                "threshold": round(u_tau, 4),
+                "message": f"Not extreme: R={R:.3f} <= threshold={u_tau:.3f}. Try larger returns.",
+            }
+
+        # Generate cascade
+        sim = autoregressive_generate(W, R, req.max_time, model, q_model)
+        run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ_gen")
+        export_run_from_arrays(str(cfg_path), run_id, "generative", sim, output_dir=str(RUNS_DIR))
+        return {"extreme": True, "run_id": run_id}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("POST /generate/from-returns failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.post("/generate")

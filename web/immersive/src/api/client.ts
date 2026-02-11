@@ -6,10 +6,10 @@ const API_URL =
     ? window.location.origin
     : (envUrl ? envUrl.replace(/\/$/, "") : "http://localhost:8000");
 
-export async function getRuns() {
+export async function getRuns(): Promise<{ run_id: string; source?: string; assets?: string[] }[]> {
   const res = await fetch(`${API_URL}/runs`);
   const json = await res.json();
-  return RunsIndex.parse(json).runs;
+  return RunsIndex.parse(json).runs as { run_id: string; source?: string; assets?: string[] }[];
 }
 
 export async function getMeta(runId: string): Promise<RunMeta> {
@@ -32,6 +32,30 @@ export async function getMetrics(runId: string, offset = 0, limit = 10000): Prom
 
 export async function getSummary(runId: string): Promise<Record<string, unknown>> {
   const res = await fetch(`${API_URL}/runs/${runId}/summary`);
+  return res.json();
+}
+
+export async function getBulk(): Promise<{ points: [number, number, number][]; count: number }> {
+  const res = await fetch(`${API_URL}/bulk`);
+  if (!res.ok) {
+    throw new Error(`Bulk fetch failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function generateFromReturns(payload: {
+  returns: Record<string, number>;
+  max_time: number;
+  seed?: number;
+}): Promise<{ extreme: boolean; run_id?: string; R?: number; threshold?: number; message?: string }> {
+  const res = await fetch(`${API_URL}/generate/from-returns`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(`Generate from returns failed: ${res.status}`);
+  }
   return res.json();
 }
 
