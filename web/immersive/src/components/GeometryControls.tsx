@@ -3,6 +3,10 @@ interface Props {
   onShowSimplexChange: (v: boolean) => void;
   pointSize: "small" | "medium" | "large";
   onPointSizeChange: (v: "small" | "medium" | "large") => void;
+  highlightPositiveOctant: boolean;
+  highlightNegativeOctant: boolean;
+  onHighlightPositiveOctantChange: (v: boolean) => void;
+  onHighlightNegativeOctantChange: (v: boolean) => void;
 }
 
 export function GeometryControls({
@@ -10,6 +14,10 @@ export function GeometryControls({
   onShowSimplexChange,
   pointSize,
   onPointSizeChange,
+  highlightPositiveOctant,
+  highlightNegativeOctant,
+  onHighlightPositiveOctantChange,
+  onHighlightNegativeOctantChange,
 }: Props) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3 shadow-lg space-y-2">
@@ -30,6 +38,34 @@ export function GeometryControls({
           <option value="large">Large</option>
         </select>
       </label>
+      <div className="space-y-2 pt-1">
+        <div className="text-[11px] uppercase tracking-wide text-slate-400">Octants</div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className={`rounded-full border px-2 py-1 text-[10px] transition-colors ${
+              highlightPositiveOctant
+                ? "border-teal-300/70 bg-teal-400/20 text-teal-100"
+                : "border-white/10 bg-white/5 text-slate-300 hover:border-teal-400/30 hover:text-teal-100"
+            }`}
+            onClick={() => onHighlightPositiveOctantChange(!highlightPositiveOctant)}
+          >
+            Log Returns +++
+          </button>
+          <button
+            type="button"
+            className={`rounded-full border px-2 py-1 text-[10px] transition-colors ${
+              highlightNegativeOctant
+                ? "border-rose-300/70 bg-rose-400/20 text-rose-100"
+                : "border-white/10 bg-white/5 text-slate-300 hover:border-rose-400/30 hover:text-rose-100"
+            }`}
+            onClick={() => onHighlightNegativeOctantChange(!highlightNegativeOctant)}
+          >
+            Log Returns ---
+          </button>
+        </div>
+        <div className="text-[10px] text-slate-500">Highlights only visible events (t &lt;= playhead).</div>
+      </div>
     </div>
   );
 }

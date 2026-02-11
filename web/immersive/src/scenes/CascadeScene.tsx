@@ -12,6 +12,8 @@ interface Props {
   mapping: CubeMappingParams;
   showSimplex: boolean;
   pointSize: number;
+  highlightPositiveOctant: boolean;
+  highlightNegativeOctant: boolean;
   highlightPoint?: [number, number, number] | null;
   assetLabels?: string[];
   bulkPoints?: [number, number, number][];
@@ -48,7 +50,19 @@ function AxisLabels({ labels }: { labels: string[] }) {
   );
 }
 
-export function CascadeScene({ events, currentTime, mapping, showSimplex, pointSize, highlightPoint, assetLabels, bulkPoints, showBulk }: Props) {
+export function CascadeScene({
+  events,
+  currentTime,
+  mapping,
+  showSimplex,
+  pointSize,
+  highlightPositiveOctant,
+  highlightNegativeOctant,
+  highlightPoint,
+  assetLabels,
+  bulkPoints,
+  showBulk,
+}: Props) {
   return (
     <Canvas
       camera={{ position: [3.2, 2.4, 3.2], fov: 42 }}
@@ -63,7 +77,14 @@ export function CascadeScene({ events, currentTime, mapping, showSimplex, pointS
       {showSimplex && <SimplexPlane />}
       {assetLabels && assetLabels.length >= 3 && <AxisLabels labels={assetLabels} />}
       {bulkPoints && bulkPoints.length > 0 && <BulkPoints positions={bulkPoints} visible={showBulk ?? false} />}
-      <EventsPoints events={events} currentTime={currentTime} mapping={mapping} pointSize={pointSize} />
+      <EventsPoints
+        events={events}
+        currentTime={currentTime}
+        mapping={mapping}
+        pointSize={pointSize}
+        highlightPositiveOctant={highlightPositiveOctant}
+        highlightNegativeOctant={highlightNegativeOctant}
+      />
       {highlightPoint && (
         <mesh position={highlightPoint}>
           <sphereGeometry args={[0.04, 16, 16]} />

@@ -77,6 +77,8 @@ export default function ViewerPage() {
 
   const [showSimplex, setShowSimplex] = useState<boolean>(false);
   const [pointSize, setPointSize] = useState<"small" | "medium" | "large">("small");
+  const [highlightPositiveOctant, setHighlightPositiveOctant] = useState<boolean>(false);
+  const [highlightNegativeOctant, setHighlightNegativeOctant] = useState<boolean>(false);
   const [mapping, setMapping] = useState<CubeMappingParams>({
     a: 3.0,
     b: 0.0,
@@ -487,6 +489,10 @@ export default function ViewerPage() {
               onShowSimplexChange={setShowSimplex}
               pointSize={pointSize}
               onPointSizeChange={setPointSize}
+              highlightPositiveOctant={highlightPositiveOctant}
+              highlightNegativeOctant={highlightNegativeOctant}
+              onHighlightPositiveOctantChange={setHighlightPositiveOctant}
+              onHighlightNegativeOctantChange={setHighlightNegativeOctant}
             />
             <GenerationControls
               mode={mode}
@@ -523,6 +529,8 @@ export default function ViewerPage() {
                     mapping={mapping}
                     showSimplex={showSimplex}
                     pointSize={pointSizeValue}
+                    highlightPositiveOctant={highlightPositiveOctant}
+                    highlightNegativeOctant={highlightNegativeOctant}
                     highlightPoint={highlightPoint}
                     assetLabels={meta?.assets ?? runs.find((r) => r.run_id === realRunId)?.assets}
                     bulkPoints={bulkPoints}
@@ -545,6 +553,8 @@ export default function ViewerPage() {
                 mapping={mapping}
                 showSimplex={showSimplex}
                 pointSize={pointSizeValue}
+                highlightPositiveOctant={highlightPositiveOctant}
+                highlightNegativeOctant={highlightNegativeOctant}
                 highlightPoint={highlightPoint}
                 assetLabels={meta?.assets ?? runs.find((r) => r.run_id === realRunId)?.assets}
                 bulkPoints={bulkPoints}

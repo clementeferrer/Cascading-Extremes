@@ -167,7 +167,7 @@ export function ReturnsTracksPanel({ data, currentTime, loading = false, error =
       title: {
         text: "Asset Returns (% log-return)",
         left: 14,
-        top: -4,
+        top: -8,
         textStyle: { color: "#e2e8f0", fontSize: 12, fontWeight: 600 },
       },
       grid,
