@@ -69,11 +69,14 @@ export function Sparklines({ series, currentTime, timeScale, startDatetimeUtc = 
     },
     series: cutSeries.map((s) => ({
       name: s.name,
+      color: s.color,
       data: s.data,
       type: "line",
       smooth: true,
       showSymbol: false,
+      itemStyle: { color: s.color },
       lineStyle: { color: s.color, width: 1.6 },
+      emphasis: { lineStyle: { color: s.color, width: 1.8 } },
     })),
   };
 
