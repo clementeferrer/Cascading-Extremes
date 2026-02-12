@@ -68,7 +68,7 @@ export default function ViewerPage() {
     "ETH-USD": -3.0,
     "BNB-USD": -1.0,
   });
-  const [horizonHours, setHorizonHours] = useState<number>(240);
+  const [horizonHours, setHorizonHours] = useState<number>(1000);
   const [temperature, setTemperature] = useState<number>(1.0);
   const [generativeHorizon, setGenerativeHorizon] = useState<number | null>(null);
   const [generating, setGenerating] = useState<boolean>(false);
