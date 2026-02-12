@@ -149,11 +149,11 @@ export function GenerationControls({
                   if (!isNumericDraft(next)) return;
                   setLocalHorizon(next);
                   const parsed = toNumber(next);
-                  if (parsed != null) onHorizonChange(Math.max(1, Math.min(1000, Math.round(parsed))));
+                  if (parsed != null) onHorizonChange(Math.max(1, Math.round(parsed)));
                 }}
                 onBlur={() => {
                   const parsed = toNumber(localHorizon);
-                  const committed = parsed != null ? Math.max(1, Math.min(1000, Math.round(parsed))) : horizon;
+                  const committed = parsed != null ? Math.max(1, Math.round(parsed)) : horizon;
                   setLocalHorizon(String(committed));
                   onHorizonChange(committed);
                 }}

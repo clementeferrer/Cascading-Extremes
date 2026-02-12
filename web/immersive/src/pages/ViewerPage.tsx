@@ -64,9 +64,9 @@ export default function ViewerPage() {
   const [mode, setMode] = useState<"real" | "generative">("real");
   const [seedRunId, setSeedRunId] = useState<string>("");
   const [returns, setReturns] = useState<Record<string, number>>({
-    "BTC-USD": -5.0,
+    "BTC-USD": -3.0,
     "ETH-USD": -3.0,
-    "BNB-USD": -1.0,
+    "BNB-USD": -3.0,
   });
   const [horizonHours, setHorizonHours] = useState<number>(1000);
   const [temperature, setTemperature] = useState<number>(1.0);

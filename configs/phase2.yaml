@@ -14,7 +14,7 @@ preprocess:
   pit_clip: 1.0e-6
 
 extremes:
-  tau: 0.98
+  tau: 0.95
   eps: 1.0e-8
   quantile_model:
     hidden_sizes: [64, 64]
