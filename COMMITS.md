@@ -124,3 +124,45 @@ git revert e94b48ef
 git push space main
 ```
 
+---
+
+## c1ef5d16 (Critical)
+
+- Full SHA: `c1ef5d16f85b2fcc77f6f751c0185a4ebc47a20f`
+- Message: `returns: add generative SAITS imputation path with safe fallback`
+- Files:
+  - `web/api/returns.py`
+  - `web/api/generative_imputation.py`
+  - `web/api/tests/test_api.py`
+  - `web/immersive/src/pages/ViewerPage.tsx`
+  - `web/immersive/src/components/ReturnsTracksPanel.tsx`
+  - `web/immersive/src/api/types.ts`
+  - `second_phase/imputation_data.py`
+  - `second_phase/train_imputer.py`
+  - `requirements.txt`
+  - `web/api/requirements.txt`
+  - `artifacts/phase2/x_series.parquet`
+  - `artifacts/phase2/x_to_returns_map.npz`
+
+### Problem Before
+- `GET /runs/{run_id}/returns` only worked for `real`.
+- In `generative`, the time-series panel was frontend `event-only` projection and had no backend contract.
+
+### What This Commit Changed
+- Extended `/returns` to support `generative`.
+- Added SAITS imputation pipeline in backend (hourly anchors from `X = R*W`).
+- Added quantile calibration path from `X` to `% log-return`.
+- Added safe fallback mode (`generative_event_only_fallback`) when SAITS/artifacts are unavailable.
+- Unified frontend to always load panel data via `/returns` for both modes.
+- Added optional response fields: `series_mode`, `imputation`.
+- Added offline scripts/artifacts for imputation data preparation.
+
+### Impact
+- `Generative` panel now has a stable backend contract and degrades gracefully.
+- If SAITS artifacts are missing, UX remains available via event-only fallback badge.
+
+### Revert
+```bash
+git revert c1ef5d16
+git push space main
+```

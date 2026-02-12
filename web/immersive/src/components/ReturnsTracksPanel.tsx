@@ -61,6 +61,9 @@ export function ReturnsTracksPanel({
   loading = false,
   error = null,
 }: Props) {
+  const showFallbackBadge = data?.series_mode === "generative_event_only_fallback";
+  const fallbackReason = data?.imputation?.fallback_reason;
+
   const option = useMemo(() => {
     if (!data || !data.assets.length) {
       return null;
@@ -295,7 +298,15 @@ export function ReturnsTracksPanel({
   }
 
   return (
-    <div className="h-full rounded-2xl border border-white/10 bg-white/5 p-2 shadow-lg">
+    <div className="relative h-full rounded-2xl border border-white/10 bg-white/5 p-2 shadow-lg">
+      {showFallbackBadge && (
+        <div
+          className="pointer-events-none absolute right-3 top-3 rounded-full border border-amber-300/40 bg-amber-400/10 px-2 py-0.5 text-[10px] text-amber-100"
+          title={fallbackReason ?? "Imputer unavailable. Showing event-only projection."}
+        >
+          Event-only fallback
+        </div>
+      )}
       <ReactECharts option={option} style={{ height: "100%", width: "100%" }} opts={{ renderer: "canvas" }} />
     </div>
   );

@@ -14,6 +14,11 @@ try:
 except ModuleNotFoundError:
     from storage import get_run_path, read_meta  # type: ignore
 
+try:
+    from web.api.generative_imputation import artifact_signature, build_generative_payload
+except ModuleNotFoundError:
+    from generative_imputation import artifact_signature, build_generative_payload  # type: ignore
+
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 PRICES_PATH = ROOT_DIR / "data" / "raw" / "prices_1h_730d.csv"
@@ -28,7 +33,7 @@ class ReturnsError(Exception):
         return self.detail
 
 
-_cached_payloads: Dict[str, Tuple[Tuple[int, int], Dict]] = {}
+_cached_payloads: Dict[str, Tuple[Tuple[int, ...], Dict]] = {}
 
 
 def _mtime_ns(path: Path) -> int:
@@ -43,11 +48,11 @@ def _normalize_asset_name(asset: str) -> str:
 
 def _asset_lookup(asset_names: List[str]) -> Dict[str, str]:
     lookup: Dict[str, str] = {}
-    for a in asset_names:
-        norm = _normalize_asset_name(a)
-        lookup[norm] = a
+    for name in asset_names:
+        norm = _normalize_asset_name(name)
+        lookup[norm] = name
         if norm.endswith("-USD"):
-            lookup[norm[:-4]] = a
+            lookup[norm[:-4]] = name
     return lookup
 
 
@@ -57,8 +62,9 @@ def _resolve_event_asset(event_asset: str, lookup: Dict[str, str]) -> str | None
         return lookup[norm]
     if norm.endswith("-USD") and norm[:-4] in lookup:
         return lookup[norm[:-4]]
-    if f"{norm}-USD" in lookup:
-        return lookup[f"{norm}-USD"]
+    with_usd = f"{norm}-USD"
+    if with_usd in lookup:
+        return lookup[with_usd]
     return None
 
 
@@ -83,55 +89,36 @@ def _align_offset(event_t: np.ndarray, event_asset_idx: np.ndarray, returns_arr:
 
     best_offset = 0
     best_score = -1.0
-    for s in range(candidate_end + 1):
-        score = float(np.abs(returns_arr[s + event_t, event_asset_idx]).sum())
+    for offset in range(candidate_end + 1):
+        score = float(np.abs(returns_arr[offset + event_t, event_asset_idx]).sum())
         if score > best_score:
             best_score = score
-            best_offset = s
+            best_offset = offset
     return best_offset, candidate_end + 1
 
 
-def get_returns_payload(run_id: str) -> Dict:
-    run_path = get_run_path(run_id)
-    meta_path = run_path / "meta.json"
-    events_path = run_path / "events.parquet"
+def _empty_real_payload(run_id: str, assets: List[str]) -> Dict:
+    return {
+        "run_id": run_id,
+        "units": "log_return_pct",
+        "assets": assets,
+        "series": {a: [] for a in assets},
+        "extreme_points": {a: [] for a in assets},
+        "alignment": {
+            "method": "offset_estimated_max_abs_return",
+            "offset_hours": 0,
+            "candidate_count": 0,
+            "start_datetime_utc": None,
+        },
+        "count": 0,
+        "series_mode": "real_dense",
+    }
 
-    if not meta_path.exists():
-        raise ReturnsError(status_code=404, detail="Run not found")
-    if not events_path.exists():
-        raise ReturnsError(status_code=404, detail="Events not found for run")
 
-    sig = (_mtime_ns(events_path), _mtime_ns(PRICES_PATH))
-    cached = _cached_payloads.get(run_id)
-    if cached is not None and cached[0] == sig:
-        return cached[1]
-
-    meta = read_meta(run_id)
-    if meta.get("source") != "real":
-        raise ReturnsError(status_code=400, detail="returns panel only available for real runs")
-
-    assets = list(meta.get("assets") or [])
-    if not assets:
-        raise ReturnsError(status_code=500, detail="Run metadata has no assets.")
-
+def _build_real_payload(run_id: str, assets: List[str], events_path: Path) -> Dict:
     events_df = pd.read_parquet(events_path, columns=["t", "asset"])
     if events_df.empty:
-        payload = {
-            "run_id": run_id,
-            "units": "log_return_pct",
-            "assets": assets,
-            "series": {a: [] for a in assets},
-            "extreme_points": {a: [] for a in assets},
-            "alignment": {
-                "method": "offset_estimated_max_abs_return",
-                "offset_hours": 0,
-                "candidate_count": 0,
-                "start_datetime_utc": None,
-            },
-            "count": 0,
-        }
-        _cached_payloads[run_id] = (sig, payload)
-        return payload
+        return _empty_real_payload(run_id, assets)
 
     returns_df = _load_returns_pct(assets)
     returns_arr = returns_df.to_numpy(dtype=np.float64)
@@ -149,25 +136,10 @@ def get_returns_payload(run_id: str) -> Dict:
         event_pairs.append((t_i, resolved_asset))
 
     if not event_pairs:
-        payload = {
-            "run_id": run_id,
-            "units": "log_return_pct",
-            "assets": assets,
-            "series": {a: [] for a in assets},
-            "extreme_points": {a: [] for a in assets},
-            "alignment": {
-                "method": "offset_estimated_max_abs_return",
-                "offset_hours": 0,
-                "candidate_count": 0,
-                "start_datetime_utc": None,
-            },
-            "count": 0,
-        }
-        _cached_payloads[run_id] = (sig, payload)
-        return payload
+        return _empty_real_payload(run_id, assets)
 
-    event_t = np.array([p[0] for p in event_pairs], dtype=np.int64)
-    event_asset_idx = np.array([asset_to_idx[p[1]] for p in event_pairs], dtype=np.int64)
+    event_t = np.array([pair[0] for pair in event_pairs], dtype=np.int64)
+    event_asset_idx = np.array([asset_to_idx[pair[1]] for pair in event_pairs], dtype=np.int64)
     offset, candidate_count = _align_offset(event_t, event_asset_idx, returns_arr)
 
     max_t = int(event_t.max())
@@ -187,7 +159,7 @@ def get_returns_payload(run_id: str) -> Dict:
         if np.isfinite(val):
             extreme_points[asset].append([float(t_i), float(val)])
 
-    payload = {
+    return {
         "run_id": run_id,
         "units": "log_return_pct",
         "assets": assets,
@@ -200,7 +172,48 @@ def get_returns_payload(run_id: str) -> Dict:
             "start_datetime_utc": pd.Timestamp(returns_df.index[offset]).isoformat(),
         },
         "count": int(len(event_pairs)),
+        "series_mode": "real_dense",
     }
+
+
+def _cache_signature(meta: Dict, events_path: Path, meta_path: Path) -> Tuple[int, ...]:
+    source = str(meta.get("source") or "")
+    if source == "real":
+        return (_mtime_ns(events_path), _mtime_ns(PRICES_PATH))
+    if source == "generative":
+        imputer_sig = artifact_signature()
+        return (_mtime_ns(events_path), _mtime_ns(meta_path), *imputer_sig)
+    return (_mtime_ns(events_path), _mtime_ns(meta_path))
+
+
+def get_returns_payload(run_id: str) -> Dict:
+    run_path = get_run_path(run_id)
+    meta_path = run_path / "meta.json"
+    events_path = run_path / "events.parquet"
+
+    if not meta_path.exists():
+        raise ReturnsError(status_code=404, detail="Run not found")
+    if not events_path.exists():
+        raise ReturnsError(status_code=404, detail="Events not found for run")
+
+    meta = read_meta(run_id)
+    source = str(meta.get("source") or "")
+    assets = list(meta.get("assets") or [])
+    if not assets:
+        raise ReturnsError(status_code=500, detail="Run metadata has no assets.")
+
+    sig = _cache_signature(meta, events_path, meta_path)
+    cached = _cached_payloads.get(run_id)
+    if cached is not None and cached[0] == sig:
+        return cached[1]
+
+    if source == "real":
+        payload = _build_real_payload(run_id, assets, events_path)
+    elif source == "generative":
+        events_df = pd.read_parquet(events_path, columns=["t", "asset", "w", "mag"])
+        payload = build_generative_payload(run_id=run_id, assets=assets, events_df=events_df)
+    else:
+        raise ReturnsError(status_code=400, detail="returns panel only available for real/generative runs")
 
     _cached_payloads[run_id] = (sig, payload)
     return payload

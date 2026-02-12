@@ -48,13 +48,20 @@ def test_returns_missing_run():
     assert resp.status_code == 404
 
 
-def test_returns_non_real_rejected():
+def test_returns_generative_supported():
     run_id = _run_id_for_source("generative")
     if run_id is None:
         pytest.skip("No generative run available for returns endpoint test.")
 
     resp = client.get(f"/runs/{run_id}/returns")
-    assert resp.status_code == 400
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["run_id"] == run_id
+    assert body["units"] == "log_return_pct"
+    assert body.get("series_mode") in {"generative_imputed", "generative_event_only_fallback"}
+    for asset in body["assets"]:
+        assert asset in body["series"]
+        assert asset in body["extreme_points"]
 
 
 def test_returns_cached_consistent_response():

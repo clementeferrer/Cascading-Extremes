@@ -55,6 +55,18 @@ export const RunReturnsResponse = z.object({
     candidate_count: z.number(),
     start_datetime_utc: z.string().nullable().optional(),
   }),
+  series_mode: z
+    .enum(["real_dense", "generative_imputed", "generative_event_only_fallback"])
+    .optional(),
+  imputation: z
+    .object({
+      method: z.literal("saits"),
+      anchor_method: z.literal("nearest_hour_max_abs"),
+      anchor_count: z.number(),
+      horizon_hours: z.number(),
+      fallback_reason: z.string().optional(),
+    })
+    .optional(),
   count: z.number().optional(),
 });
 
