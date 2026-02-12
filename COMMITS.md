@@ -126,9 +126,9 @@ git push space main
 
 ---
 
-## c1ef5d16 (Critical)
+## 99d8f3c4 (Critical)
 
-- Full SHA: `c1ef5d16f85b2fcc77f6f751c0185a4ebc47a20f`
+- Full SHA: `99d8f3c4df85d6df8a8f53abb00f22f6c68d7ae5`
 - Message: `returns: add generative SAITS imputation path with safe fallback`
 - Files:
   - `web/api/returns.py`
@@ -163,6 +163,6 @@ git push space main
 
 ### Revert
 ```bash
-git revert c1ef5d16
+git revert 99d8f3c4
 git push space main
 ```
