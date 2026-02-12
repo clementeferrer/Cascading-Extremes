@@ -9,6 +9,7 @@ interface Props {
   timeScale: number;
   highlightPositiveOctant: boolean;
   highlightNegativeOctant: boolean;
+  eventOnly?: boolean;
   loading?: boolean;
   error?: string | null;
 }
@@ -56,6 +57,7 @@ export function ReturnsTracksPanel({
   timeScale,
   highlightPositiveOctant,
   highlightNegativeOctant,
+  eventOnly = false,
   loading = false,
   error = null,
 }: Props) {
@@ -105,7 +107,10 @@ export function ReturnsTracksPanel({
         show: true,
         lineStyle: { color: "rgba(226,232,240,0.35)", width: 1, type: "dashed" },
       },
-      name: idx === assets.length - 1 ? "Time (UTC, aligned to first extreme)" : "",
+      name:
+        idx === assets.length - 1
+          ? (data.alignment.start_datetime_utc ? "Time (UTC, aligned to first extreme)" : "Time (hours)")
+          : "",
       nameLocation: "middle",
       nameGap: 30,
       nameTextStyle: { color: "#94a3b8", fontSize: 10 },
@@ -123,7 +128,7 @@ export function ReturnsTracksPanel({
         axisLabel: {
           color: "#94a3b8",
           fontSize: 10,
-          formatter: (v: number) => `${v.toFixed(1)}%`,
+          formatter: (v: number) => (eventOnly ? `${v.toFixed(2)}` : `${v.toFixed(1)}%`),
         },
         splitLine: { show: true, lineStyle: { color: "rgba(148,163,184,0.12)" } },
         name: key,
@@ -219,7 +224,7 @@ export function ReturnsTracksPanel({
       backgroundColor: "transparent",
       animation: false,
       title: {
-        text: "Asset Returns (% log-return)",
+        text: eventOnly ? "Asset Returns (event-only projection)" : "Asset Returns (% log-return)",
         left: 14,
         top: -2,
         textStyle: { color: "#e2e8f0", fontSize: 12, fontWeight: 600 },
@@ -256,14 +261,14 @@ export function ReturnsTracksPanel({
             const p = lineByAsset.get(key);
             if (!p) return `${marker}${key} Return: --`;
             const val = Number(Array.isArray(p.value) ? p.value[1] : p.value);
-            return `${marker}${key} Return: ${val.toFixed(3)}%`;
+            return `${marker}${key} Return: ${val.toFixed(3)}${eventOnly ? "" : "%"}`;
           });
           return [header, ...lineRows].join("<br/>");
         },
       },
       series: [...lineSeries, ...extremeSeries],
     };
-  }, [data, currentTime, events, timeScale, highlightPositiveOctant, highlightNegativeOctant]);
+  }, [data, currentTime, events, timeScale, highlightPositiveOctant, highlightNegativeOctant, eventOnly]);
 
   if (loading) {
     return (

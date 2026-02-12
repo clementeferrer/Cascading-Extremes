@@ -368,6 +368,69 @@ export default function ViewerPage() {
     return 0.18;
   }, [pointSize]);
 
+  const generativeReturnsData = useMemo<RunReturnsResponse | null>(() => {
+    if (mode !== "generative") return null;
+    if (!events.length) return null;
+    const assets = (meta?.assets && meta.assets.length ? meta.assets : ["BTC-USD", "ETH-USD", "BNB-USD"]).slice(0, 3);
+    const ordered = [...events].sort((a, b) => a.t - b.t);
+    const series: Record<string, [number, number][]> = {};
+    const extremePoints: Record<string, [number, number][]> = {};
+    const assetIndex = new Map<string, number>();
+    assets.forEach((asset, idx) => {
+      const key = asset.trim().toUpperCase();
+      assetIndex.set(key, idx);
+      if (key.endsWith("-USD")) assetIndex.set(key.slice(0, -4), idx);
+    });
+
+    assets.forEach((asset, idx) => {
+      const arr: [number, number][] = [];
+      for (const ev of ordered) {
+        const w = ev.w?.[idx] ?? 0;
+        const mag = ev.mag ?? 0;
+        const value = w * mag;
+        if (Number.isFinite(value) && Number.isFinite(ev.t)) {
+          arr.push([ev.t, value]);
+        }
+      }
+      series[asset] = arr;
+      extremePoints[asset] = [];
+    });
+
+    for (const ev of ordered) {
+      const label = String(ev.asset ?? "").trim().toUpperCase();
+      const idx =
+        assetIndex.get(label) ??
+        (label.endsWith("-USD") ? assetIndex.get(label.slice(0, -4)) : assetIndex.get(`${label}-USD`));
+      if (idx == null) continue;
+      const asset = assets[idx];
+      const w = ev.w?.[idx] ?? 0;
+      const mag = ev.mag ?? 0;
+      const value = w * mag;
+      if (Number.isFinite(value) && Number.isFinite(ev.t)) {
+        extremePoints[asset].push([ev.t, value]);
+      }
+    }
+
+    return {
+      run_id: activeRun || generativeRunId || "generative",
+      units: "log_return_pct",
+      assets,
+      series,
+      extreme_points: extremePoints,
+      alignment: {
+        method: "event_only_projection_rw",
+        offset_hours: 0,
+        candidate_count: ordered.length,
+        start_datetime_utc: null,
+      },
+      count: ordered.length,
+    };
+  }, [mode, events, meta?.assets, activeRun, generativeRunId]);
+
+  const panelData = mode === "real" ? returnsData : generativeReturnsData;
+  const panelLoading = mode === "real" ? returnsLoading : false;
+  const panelError = mode === "real" ? returnsError : null;
+
   const viewOptions = useMemo(() => {
     return runs
       .filter((r) => r.source === "real")
@@ -455,7 +518,7 @@ export default function ViewerPage() {
   };
 
   const playDisabled = mode === "real" ? events.length === 0 || maxTime <= 0 : generating;
-  const showReturnsPanel = mode === "real";
+  const showReturnsPanel = mode === "real" || mode === "generative";
 
   return (
     <div className="h-screen overflow-hidden bg-night text-slate-100 relative">
@@ -549,14 +612,15 @@ export default function ViewerPage() {
                 </div>
                 <div className="min-h-0">
                   <ReturnsTracksPanel
-                    data={returnsData}
+                    data={panelData}
                     currentTime={displayTime}
                     events={events}
                     timeScale={timeScale}
                     highlightPositiveOctant={highlightPositiveOctant}
                     highlightNegativeOctant={highlightNegativeOctant}
-                    loading={returnsLoading}
-                    error={returnsError}
+                    eventOnly={mode === "generative"}
+                    loading={panelLoading}
+                    error={panelError}
                   />
                 </div>
               </div>
