@@ -69,6 +69,7 @@ export default function ViewerPage() {
     "BNB-USD": -1.0,
   });
   const [horizonHours, setHorizonHours] = useState<number>(240);
+  const [temperature, setTemperature] = useState<number>(1.0);
   const [generativeHorizon, setGenerativeHorizon] = useState<number | null>(null);
   const [generating, setGenerating] = useState<boolean>(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
@@ -390,10 +391,12 @@ export default function ViewerPage() {
     setShowBulk(false);
     try {
       const seed = Math.floor(Math.random() * 2147483647);
-      console.info("[GENERATE] START", { returns, horizonHours, seed });
+      console.info("[GENERATE] START", { returns, horizonHours, temperature, seed });
       const res = await generateFromReturns({
         returns,
         max_time: horizonHours,
+        temperature,
+        context_run_id: realRunId || undefined,
         seed,
       });
       if (!res.extreme) {
@@ -503,11 +506,13 @@ export default function ViewerPage() {
               mode={mode}
               returns={returns}
               horizon={horizonHours}
+              temperature={temperature}
               generating={generating}
               generateError={generateError}
               onModeChange={setMode}
               onReturnsChange={handleReturnsChange}
               onHorizonChange={setHorizonHours}
+              onTemperatureChange={setTemperature}
               onGenerate={() => handleGenerate(true)}
               viewRunId={realRunId}
               viewOptions={viewOptions}

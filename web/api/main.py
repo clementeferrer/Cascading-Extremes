@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+import pandas as pd
 import torch
 from pydantic import BaseModel
 
@@ -90,6 +91,61 @@ def _laplace_quantile(u: np.ndarray) -> np.ndarray:
     """Inverse CDF of standard Laplace used by return-to-margin mapping."""
     centered = u - 0.5
     return -np.sign(centered) * np.log(np.maximum(1.0 - 2.0 * np.abs(centered), 1e-15))
+
+
+def _latest_real_run_id() -> Optional[str]:
+    for run in reversed(list_runs()):
+        if run.get("source") == "real":
+            run_id = run.get("run_id")
+            if isinstance(run_id, str) and run_id:
+                return run_id
+    return None
+
+
+def _load_real_context_prompt(context_run_id: Optional[str]) -> dict[str, np.ndarray]:
+    preferred = context_run_id or "real_latest"
+    run_id = preferred
+    try:
+        meta = read_meta(run_id)
+    except Exception:
+        fallback = _latest_real_run_id()
+        if not fallback:
+            raise HTTPException(status_code=500, detail="No real run available for completion context.")
+        run_id = fallback
+        meta = read_meta(run_id)
+
+    if meta.get("source") != "real":
+        raise HTTPException(status_code=400, detail="context_run_id must reference a real run.")
+
+    events_path = get_run_path(run_id) / "events.parquet"
+    if not events_path.exists():
+        raise HTTPException(status_code=500, detail=f"Context events not found for run: {run_id}")
+
+    df = pd.read_parquet(events_path)
+    if df.empty:
+        raise HTTPException(status_code=500, detail=f"Context run has no events: {run_id}")
+
+    if "t" not in df.columns or "w" not in df.columns or "mag" not in df.columns:
+        raise HTTPException(status_code=500, detail="Context run is missing required event columns.")
+
+    df = df.sort_values("t")
+    W = np.vstack(df["w"].to_numpy()).astype(np.float32)
+    R = df["mag"].to_numpy(np.float32)
+    T_raw = df["t"].to_numpy(np.float32)
+
+    if len(T_raw) < 1:
+        raise HTTPException(status_code=500, detail="Context run has invalid timeline.")
+
+    # Shift timeline so the latest real event sits at t=0.
+    T = T_raw - float(T_raw[-1])
+    dT = np.diff(T, prepend=T[0]).astype(np.float32)
+    if len(dT) > 1:
+        med = float(np.median(dT[1:]))
+        dT[0] = med if np.isfinite(med) and med > 1.0e-6 else 1.0
+    elif len(dT) == 1:
+        dT[0] = 1.0
+
+    return {"W": W, "R": R, "T": T.astype(np.float32), "dT": dT.astype(np.float32)}
 
 
 
@@ -199,6 +255,7 @@ class GenerateRequest(BaseModel):
     phi: float = 1.5708           # Polar angle phi in [0, pi], default pi/2 (BTC axis)
     magnitude: float = 3.0        # Radial magnitude R of the initial shock
     max_time: float = 240.0       # Time horizon (hours) — the only stopping criterion
+    temperature: float = 1.0      # Decoding temperature for sampling
     config: str = "configs/phase2.yaml"
     seed: Optional[int] = None    # Random seed for reproducibility
 
@@ -248,7 +305,7 @@ def generate_continue(req: GenerateRequest):
     r0 = max(req.magnitude, u0 + 0.01)
 
     # Autoregressive generation — only max_time stops the cascade
-    sim = autoregressive_generate(w0, r0, req.max_time, model, q_model)
+    sim = autoregressive_generate(w0, r0, req.max_time, model, q_model, temperature=req.temperature)
 
     run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ_gen")
     cfg_path = _resolve_config_path(req.config)
@@ -259,6 +316,8 @@ def generate_continue(req: GenerateRequest):
 class GenerateFromReturnsRequest(BaseModel):
     returns: dict[str, float]  # e.g. {"BTC-USD": -5.0, "ETH-USD": -3.0, "BNB-USD": -1.0}
     max_time: float = 240.0
+    temperature: float = 1.0
+    context_run_id: Optional[str] = None
     seed: Optional[int] = None
 
 
@@ -282,13 +341,13 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
 
         # Load CDFs
         cdf_data = np.load(str(cdfs_path))
-        asset_order = sorted(req.returns.keys())
+        asset_order = sorted(str(a) for a in cdf_data.files)
 
         # Convert % returns to Laplace margins
         X_vals = []
         for asset in asset_order:
-            if asset not in cdf_data:
-                raise HTTPException(status_code=400, detail=f"Unknown asset: {asset}")
+            if asset not in req.returns:
+                raise HTTPException(status_code=400, detail=f"Missing return input for asset: {asset}")
             sorted_vals = cdf_data[asset]
             cdf = EmpiricalCDF(sorted_values=sorted_vals, eps=1e-6)
             r_decimal = req.returns[asset] / 100.0
@@ -329,8 +388,17 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
                 "message": f"Not extreme: R={R:.3f} <= threshold={u_tau:.3f}. Try larger returns.",
             }
 
-        # Generate cascade
-        sim = autoregressive_generate(W, R, req.max_time, model, q_model)
+        # Completion from full real context -> append seed (W,R) -> autoregressive continuation.
+        prompt = _load_real_context_prompt(req.context_run_id)
+        sim = autoregressive_generate(
+            W,
+            R,
+            req.max_time,
+            model,
+            q_model,
+            temperature=req.temperature,
+            prompt=prompt,
+        )
         run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ_gen")
         export_run_from_arrays(str(cfg_path), run_id, "generative", sim, output_dir=str(RUNS_DIR))
         return {"extreme": True, "run_id": run_id}

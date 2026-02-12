@@ -67,13 +67,22 @@ def _compute_intensity(model, h, T_hist, R_hist, W_hist):
     return lam[0, -1].item(), psi[0, -1].item()
 
 
-def _sample_candidate(model, h, R_hist, q_model, d_assets):
+def _clamp_temperature(temperature: float) -> float:
+    """Clamp sampling temperature to a safe range."""
+    return float(np.clip(temperature, 0.2, 3.0))
+
+
+def _sample_candidate(model, h, R_hist, q_model, d_assets, temperature: float = 1.0):
     """Sample a candidate mark (W, R) from the model's conditional distributions."""
+    temp = _clamp_temperature(temperature)
     with torch.no_grad():
         pi, mu, kappa = model.vmf_params(h)
         pi_last = pi[0, -1]
         mu_last = mu[0, -1]
         kappa_last = kappa[0, -1]
+        # Temperature decoding: soften mixture logits and directional concentration.
+        pi_last = torch.softmax(torch.log(pi_last + 1.0e-8) / temp, dim=-1)
+        kappa_last = torch.clamp(kappa_last / temp, min=1.0e-6)
         w_next = sample_vmf_mixture(pi_last, mu_last, kappa_last, d_assets).numpy()
 
         log_r_in = torch.tensor([[np.log(R_hist[-1] + 1e-8)]], dtype=torch.float32)
@@ -94,6 +103,8 @@ def autoregressive_generate(
     model: SphericalCascadeTransformer,
     q_model: SphericalQuantileMLP,
     max_events_cap: int = 2000,
+    temperature: float = 1.0,
+    prompt: Optional[Dict[str, np.ndarray]] = None,
 ) -> Dict[str, np.ndarray]:
     """LLM-style autoregressive generation of cascading extremes.
 
@@ -106,18 +117,54 @@ def autoregressive_generate(
       5. Append event, repeat
 
     Stops only when T exceeds max_time (no fixed event count).
+
+    If `prompt` is provided, it is used as historical context and the returned
+    arrays include only the seed event (w0, r0) plus generated continuation,
+    with time re-based to start at zero on the seed.
     """
     d_assets = model.d_assets
-    W = [w0.astype(np.float32)]
-    R = [float(r0)]
-    T = [0.0]
-    dT_list = [1.0]  # median placeholder for first event
+    seed_idx = 0
+
+    if prompt is not None and len(prompt.get("W", [])) > 0:
+        W = [np.asarray(w, dtype=np.float32) for w in prompt["W"]]
+        R = [float(v) for v in prompt["R"]]
+        T = [float(v) for v in prompt["T"]]
+        dT_list = [float(v) for v in prompt.get("dT", np.array([], dtype=np.float32))]
+        if len(W) != len(R) or len(W) != len(T):
+            raise ValueError("Prompt context must have aligned W/R/T lengths.")
+        if len(dT_list) != len(W):
+            dT_arr = np.diff(np.array(T, dtype=np.float32), prepend=np.array(T, dtype=np.float32)[0])
+            if len(dT_arr) > 1:
+                med = float(np.median(dT_arr[1:]))
+                dT_arr[0] = med if np.isfinite(med) and med > 1.0e-6 else 1.0
+            elif len(dT_arr) == 1:
+                dT_arr[0] = 1.0
+            dT_list = dT_arr.astype(np.float32).tolist()
+
+        recent_dt = np.array(dT_list[-min(len(dT_list), 64):], dtype=np.float32)
+        recent_dt = recent_dt[np.isfinite(recent_dt) & (recent_dt > 1.0e-6)]
+        dt_seed = float(np.median(recent_dt)) if recent_dt.size else 1.0
+        t_seed = float(T[-1] + dt_seed)
+
+        W.append(w0.astype(np.float32))
+        R.append(float(r0))
+        T.append(t_seed)
+        dT_list.append(dt_seed)
+
+        seed_idx = len(W) - 1
+        horizon_end = t_seed + float(max_time)
+    else:
+        W = [w0.astype(np.float32)]
+        R = [float(r0)]
+        T = [0.0]
+        dT_list = [1.0]  # median placeholder for first event
+        horizon_end = float(max_time)
 
     for _ in range(max_events_cap):
         h, tokens_t, W_hist, R_hist, T_hist = _encode_history(model, W, R, dT_list, T)
 
         # 1. Sample next mark (direction + magnitude)
-        w_next, r_next = _sample_candidate(model, h, R, q_model, d_assets)
+        w_next, r_next = _sample_candidate(model, h, R, q_model, d_assets, temperature=temperature)
 
         # 2. Sample timing from Hawkes intensity: dT ~ Exp(lambda)
         lam, psi = _compute_intensity(model, h, T_hist, R_hist, W_hist)
@@ -125,7 +172,7 @@ def autoregressive_generate(
         dt_next = float(np.random.exponential(1.0 / lam))
         t_next = T[-1] + dt_next
 
-        if t_next > max_time:
+        if t_next > horizon_end:
             break
 
         W.append(w_next)
@@ -133,11 +180,29 @@ def autoregressive_generate(
         dT_list.append(dt_next)
         T.append(t_next)
 
+    if seed_idx > 0:
+        T_out = np.array(T[seed_idx:], dtype=np.float32)
+        dT_out = np.array(dT_list[seed_idx:], dtype=np.float32)
+        W_out = np.array(W[seed_idx:], dtype=np.float32)
+        R_out = np.array(R[seed_idx:], dtype=np.float32)
+
+        T_out = T_out - T_out[0]
+        if len(dT_out) > 1:
+            d0 = float(np.median(dT_out[1:]))
+            dT_out[0] = d0 if np.isfinite(d0) and d0 > 1.0e-6 else dT_out[0]
+        elif len(dT_out) == 1:
+            dT_out[0] = 1.0
+    else:
+        T_out = np.array(T, dtype=np.float32)
+        dT_out = np.array(dT_list, dtype=np.float32)
+        W_out = np.array(W, dtype=np.float32)
+        R_out = np.array(R, dtype=np.float32)
+
     return {
-        "T": np.array(T, dtype=np.float32),
-        "dT": np.array(dT_list, dtype=np.float32),
-        "W": np.array(W, dtype=np.float32),
-        "R": np.array(R, dtype=np.float32),
+        "T": T_out,
+        "dT": dT_out,
+        "W": W_out,
+        "R": R_out,
     }
 
 

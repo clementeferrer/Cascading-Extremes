@@ -1,15 +1,19 @@
+import { useEffect, useState, type FocusEvent } from "react";
+
 interface Props {
   mode: "real" | "generative";
   viewRunId?: string;
   viewOptions?: { id: string; label: string }[];
   returns: Record<string, number>;
   horizon: number;
+  temperature: number;
   generating: boolean;
   generateError: string | null;
   onModeChange: (v: "real" | "generative") => void;
   onViewRunChange?: (v: string) => void;
   onReturnsChange: (asset: string, value: number) => void;
   onHorizonChange: (v: number) => void;
+  onTemperatureChange: (v: number) => void;
   onGenerate: () => void;
 }
 
@@ -25,15 +29,47 @@ export function GenerationControls({
   viewOptions,
   returns,
   horizon,
+  temperature,
   generating,
   generateError,
   onModeChange,
   onViewRunChange,
   onReturnsChange,
   onHorizonChange,
+  onTemperatureChange,
   onGenerate,
 }: Props) {
   const assets = Object.keys(ASSET_LABELS);
+  const [localReturns, setLocalReturns] = useState<Record<string, string>>(() =>
+    Object.fromEntries(assets.map((asset) => [asset, String(returns[asset] ?? 0)])) as Record<string, string>
+  );
+  const [localHorizon, setLocalHorizon] = useState<string>(String(horizon));
+  const [localTemperature, setLocalTemperature] = useState<string>(String(temperature));
+
+  useEffect(() => {
+    setLocalReturns(
+      Object.fromEntries(assets.map((asset) => [asset, String(returns[asset] ?? 0)])) as Record<string, string>
+    );
+  }, [returns]);
+
+  useEffect(() => {
+    setLocalHorizon(String(horizon));
+  }, [horizon]);
+
+  useEffect(() => {
+    setLocalTemperature(String(temperature));
+  }, [temperature]);
+
+  const normalizeDraft = (value: string) => value.replace(",", ".");
+  const isNumericDraft = (value: string) => /^-?\d*\.?\d*$/.test(value);
+  const toNumber = (value: string): number | null => {
+    if (value === "" || value === "-" || value === "." || value === "-.") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const onInputFocus = (event: FocusEvent<HTMLInputElement>) => {
+    event.currentTarget.select();
+  };
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3 shadow-lg space-y-2">
@@ -76,10 +112,23 @@ export function GenerationControls({
               <span className="w-[72px] shrink-0 text-slate-200 font-medium">{ASSET_LABELS[asset]}</span>
               <div className="relative flex-1">
                 <input
-                  type="number"
-                  step={0.1}
-                  value={returns[asset] ?? 0}
-                  onChange={(e) => onReturnsChange(asset, Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  value={localReturns[asset] ?? ""}
+                  onFocus={onInputFocus}
+                  onChange={(e) => {
+                    const next = normalizeDraft(e.target.value);
+                    if (!isNumericDraft(next)) return;
+                    setLocalReturns((prev) => ({ ...prev, [asset]: next }));
+                    const parsed = toNumber(next);
+                    if (parsed != null) onReturnsChange(asset, parsed);
+                  }}
+                  onBlur={() => {
+                    const parsed = toNumber(localReturns[asset] ?? "");
+                    const committed = parsed ?? (returns[asset] ?? 0);
+                    setLocalReturns((prev) => ({ ...prev, [asset]: String(committed) }));
+                    onReturnsChange(asset, committed);
+                  }}
                   className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 pr-6 text-slate-100"
                   disabled={generating}
                 />
@@ -91,15 +140,53 @@ export function GenerationControls({
             <span className="w-[72px] shrink-0 text-slate-200 font-medium">Horizon</span>
             <div className="relative flex-1">
               <input
-                type="number"
-                min={1}
-                max={1000}
-                value={horizon}
-                onChange={(e) => onHorizonChange(Number(e.target.value))}
+                type="text"
+                inputMode="numeric"
+                value={localHorizon}
+                onFocus={onInputFocus}
+                onChange={(e) => {
+                  const next = normalizeDraft(e.target.value);
+                  if (!isNumericDraft(next)) return;
+                  setLocalHorizon(next);
+                  const parsed = toNumber(next);
+                  if (parsed != null) onHorizonChange(Math.max(1, Math.min(1000, Math.round(parsed))));
+                }}
+                onBlur={() => {
+                  const parsed = toNumber(localHorizon);
+                  const committed = parsed != null ? Math.max(1, Math.min(1000, Math.round(parsed))) : horizon;
+                  setLocalHorizon(String(committed));
+                  onHorizonChange(committed);
+                }}
                 className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 pr-6 text-slate-100"
                 disabled={generating}
               />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]">hrs</span>
+            </div>
+          </label>
+          <label className="flex items-center gap-2 text-slate-300">
+            <span className="w-[72px] shrink-0 text-slate-200 font-medium">Temperature</span>
+            <div className="relative flex-1">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={localTemperature}
+                onFocus={onInputFocus}
+                onChange={(e) => {
+                  const next = normalizeDraft(e.target.value);
+                  if (!isNumericDraft(next)) return;
+                  setLocalTemperature(next);
+                  const parsed = toNumber(next);
+                  if (parsed != null) onTemperatureChange(Math.max(0.2, Math.min(3.0, parsed)));
+                }}
+                onBlur={() => {
+                  const parsed = toNumber(localTemperature);
+                  const committed = parsed != null ? Math.max(0.2, Math.min(3.0, parsed)) : temperature;
+                  setLocalTemperature(String(committed));
+                  onTemperatureChange(committed);
+                }}
+                className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-slate-100"
+                disabled={generating}
+              />
             </div>
           </label>
           {generateError && (

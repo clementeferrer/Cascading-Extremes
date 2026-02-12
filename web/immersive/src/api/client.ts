@@ -62,6 +62,8 @@ export async function getBulk(): Promise<{ points: [number, number, number][]; c
 export async function generateFromReturns(payload: {
   returns: Record<string, number>;
   max_time: number;
+  temperature?: number;
+  context_run_id?: string;
   seed?: number;
 }): Promise<{ extreme: boolean; run_id?: string; R?: number; threshold?: number; message?: string }> {
   const res = await fetch(`${API_URL}/generate/from-returns`, {
