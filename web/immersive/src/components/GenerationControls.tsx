@@ -22,6 +22,7 @@ const ASSET_LABELS: Record<string, string> = {
   "ETH-USD": "ETH-USD",
   "BNB-USD": "BNB-USD",
 };
+const MAX_HORIZON_HOURS = 17468;
 
 export function GenerationControls({
   mode,
@@ -149,11 +150,12 @@ export function GenerationControls({
                   if (!isNumericDraft(next)) return;
                   setLocalHorizon(next);
                   const parsed = toNumber(next);
-                  if (parsed != null) onHorizonChange(Math.max(1, Math.round(parsed)));
+                  if (parsed != null) onHorizonChange(Math.max(1, Math.min(MAX_HORIZON_HOURS, Math.round(parsed))));
                 }}
                 onBlur={() => {
                   const parsed = toNumber(localHorizon);
-                  const committed = parsed != null ? Math.max(1, Math.round(parsed)) : horizon;
+                  const committed =
+                    parsed != null ? Math.max(1, Math.min(MAX_HORIZON_HOURS, Math.round(parsed))) : horizon;
                   setLocalHorizon(String(committed));
                   onHorizonChange(committed);
                 }}

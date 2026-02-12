@@ -74,6 +74,7 @@ CONFIGS_DIR = ROOT_DIR / "configs"
 RUNS_DIR = ARTIFACTS_DIR / "runs"
 RUNS_DIR.mkdir(parents=True, exist_ok=True)
 PHASE2_META_PATH = ARTIFACTS_DIR / "phase2" / "meta.json"
+PRICES_PATH = ROOT_DIR / "data" / "raw" / "prices_1h_730d.csv"
 
 
 def _resolve_config_path(config_path: str) -> Path:
@@ -86,6 +87,17 @@ def _resolve_config_path(config_path: str) -> Path:
 def _dist_dir() -> Path:
     static_env = os.getenv("IMMERSIVE_STATIC")
     return Path(static_env) if static_env else ROOT_DIR / "web" / "immersive" / "dist"
+
+
+def _max_horizon_hours(default: int = 17468) -> int:
+    if PRICES_PATH.exists():
+        try:
+            n = len(pd.read_csv(PRICES_PATH, usecols=[0]))
+            if n >= 2:
+                return int(n - 1)
+        except Exception:
+            pass
+    return int(default)
 
 
 def _laplace_quantile(u: np.ndarray) -> np.ndarray:
@@ -364,7 +376,9 @@ def generate_continue(req: GenerateRequest):
     r0 = max(req.magnitude, u0 + 0.01)
 
     # Autoregressive generation — only max_time stops the cascade
-    sim = autoregressive_generate(w0, r0, req.max_time, model, q_model, temperature=req.temperature)
+    max_horizon = _max_horizon_hours()
+    max_time = float(np.clip(req.max_time, 1.0, float(max_horizon)))
+    sim = autoregressive_generate(w0, r0, max_time, model, q_model, temperature=req.temperature)
 
     run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ_gen")
     cfg_path = _resolve_config_path(req.config)
@@ -452,10 +466,12 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
 
         # Completion from full real context -> append seed (W,R) -> autoregressive continuation.
         prompt = _load_real_context_prompt(req.context_run_id)
+        max_horizon = _max_horizon_hours(default=n - 1)
+        max_time = float(np.clip(req.max_time, 1.0, float(max_horizon)))
         sim = autoregressive_generate(
             W,
             R,
-            req.max_time,
+            max_time,
             model,
             q_model,
             temperature=req.temperature,

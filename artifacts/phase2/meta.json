@@ -4,7 +4,7 @@
     "BTC-USD",
     "ETH-USD"
   ],
-  "tau": 0.98,
+  "tau": 0.95,
   "config": {
     "data": {
       "symbols": [
@@ -23,7 +23,7 @@
       "pit_clip": 1e-06
     },
     "extremes": {
-      "tau": 0.98,
+      "tau": 0.95,
       "eps": 1e-08,
       "quantile_model": {
         "hidden_sizes": [
@@ -61,7 +61,7 @@
     "train": {
       "lr": 0.0003,
       "batch_size": 32,
-      "epochs": 200,
+      "epochs": 40,
       "weight_decay": 0.0001,
       "seed": 42,
       "device": "cpu",
@@ -79,6 +79,6 @@
     }
   },
   "u_meta": {
-    "tau": 0.9800000190734863
+    "tau": 0.949999988079071
   }
 }
