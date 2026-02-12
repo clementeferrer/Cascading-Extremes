@@ -268,7 +268,6 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
         raise HTTPException(status_code=500, detail="Phase 2 model required for generation.")
 
     cdfs_path = ARTIFACTS_DIR / "phase2" / "cdfs.npz"
-    garch_filter_path = ARTIFACTS_DIR / "phase2" / "garch_filter.json"
     p2_model_path = ARTIFACTS_DIR / "phase2" / "model.pt"
     p2_q_path = ARTIFACTS_DIR / "phase2" / "quantile_model.pt"
     if not cdfs_path.exists() or not p2_model_path.exists() or not p2_q_path.exists():
@@ -284,13 +283,6 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
         # Load CDFs
         cdf_data = np.load(str(cdfs_path))
         asset_order = sorted(req.returns.keys())
-        garch_filter = {}
-        if garch_filter_path.exists():
-            try:
-                garch_payload = json.loads(garch_filter_path.read_text(encoding="utf-8"))
-                garch_filter = garch_payload.get("by_asset", {}) if isinstance(garch_payload, dict) else {}
-            except Exception:
-                garch_filter = {}
 
         # Convert % returns to Laplace margins
         X_vals = []
@@ -300,15 +292,7 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
             sorted_vals = cdf_data[asset]
             cdf = EmpiricalCDF(sorted_values=sorted_vals, eps=1e-6)
             r_decimal = req.returns[asset] / 100.0
-            # Approximate filtered residual with latest GARCH volatility:
-            # eps_hat = (Q_t - mu_hat) / sigma_hat_t.
-            filtered_input = r_decimal
-            filter_info = garch_filter.get(asset, {}) if isinstance(garch_filter, dict) else {}
-            mu_hat = float(filter_info.get("mu", 0.0)) if filter_info else 0.0
-            sigma_hat = float(filter_info.get("sigma_last", 0.0)) if filter_info else 0.0
-            if np.isfinite(sigma_hat) and sigma_hat > 1.0e-12:
-                filtered_input = (r_decimal - mu_hat) / sigma_hat
-            u = cdf.cdf(np.array([filtered_input]))[0]
+            u = cdf.cdf(np.array([r_decimal]))[0]
             x = _laplace_quantile(np.array([u]))[0]
             X_vals.append(x)
 
