@@ -127,7 +127,11 @@ def fit(cfg: Dict, events: Optional[Dict[str, np.ndarray]] = None):
         )
 
         returns = compute_log_returns(prices)
-        residuals, sigma = fit_garch(returns, dist=cfg["preprocess"].get("garch_dist", "t"))
+        residuals, sigma, garch_filter = fit_garch(
+            returns,
+            dist=cfg["preprocess"].get("garch_dist", "t"),
+            return_filter=True,
+        )
         X, cdfs = standardize_laplace(residuals, pit_clip=cfg["preprocess"].get("pit_clip", 1e-6))
         X = X.dropna()
         timestamps = X.index
@@ -151,6 +155,14 @@ def fit(cfg: Dict, events: Optional[Dict[str, np.ndarray]] = None):
             Path(artifact_dir) / "cdfs.npz",
             **{k: v.sorted_values for k, v in cdfs.items()},
         )
+        save_json(
+            str(Path(artifact_dir) / "garch_filter.json"),
+            {
+                "type": "garch_11_filtered_log_returns",
+                "formula": "eps_hat=(Q_t-mu_hat)/sigma_hat_t",
+                "by_asset": garch_filter,
+            },
+        )
         torch.save(q_model.state_dict(), Path(artifact_dir) / "quantile_model.pt")
         save_json(
             str(Path(artifact_dir) / "meta.json"),
@@ -159,6 +171,7 @@ def fit(cfg: Dict, events: Optional[Dict[str, np.ndarray]] = None):
                 "tau": cfg["extremes"]["tau"],
                 "config": cfg,
                 "u_meta": {"tau": float(u_meta["tau"][0])},
+                "preprocess_space": "standardized_residuals",
             },
         )
 

@@ -6,7 +6,7 @@ margins instead of exponential margins.
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -25,11 +25,15 @@ def compute_log_returns(prices: pd.DataFrame) -> pd.DataFrame:
     return _compute_log_returns(prices)
 
 
-def fit_garch(df: pd.DataFrame, dist: str = "t") -> Tuple[pd.DataFrame, pd.DataFrame]:
+def fit_garch(
+    df: pd.DataFrame,
+    dist: str = "t",
+    return_filter: bool = False,
+) -> Tuple[pd.DataFrame, pd.DataFrame] | Tuple[pd.DataFrame, pd.DataFrame, Dict[str, Dict[str, Any]]]:
     """Forward to cascades.preprocess lazily."""
     from cascades.preprocess import fit_garch as _fit_garch
 
-    return _fit_garch(df, dist=dist)
+    return _fit_garch(df, dist=dist, return_filter=return_filter)
 
 
 def laplace_quantile(u: np.ndarray) -> np.ndarray:

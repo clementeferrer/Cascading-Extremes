@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -13,9 +13,17 @@ def compute_log_returns(prices: pd.DataFrame) -> pd.DataFrame:
     return returns
 
 
-def fit_garch(df: pd.DataFrame, dist: str = "t") -> Tuple[pd.DataFrame, pd.DataFrame]:
+def fit_garch(
+    df: pd.DataFrame,
+    dist: str = "t",
+    return_filter: bool = False,
+) -> Union[
+    Tuple[pd.DataFrame, pd.DataFrame],
+    Tuple[pd.DataFrame, pd.DataFrame, Dict[str, Dict[str, Any]]],
+]:
     residuals = {}
     sigma = {}
+    filter_meta: Dict[str, Dict[str, Any]] = {}
 
     for col in df.columns:
         series = df[col].dropna()
@@ -28,11 +36,25 @@ def fit_garch(df: pd.DataFrame, dist: str = "t") -> Tuple[pd.DataFrame, pd.DataF
         aligned = series.loc[cond_vol.index]
         resid = resid.loc[aligned.index]
         cond_vol = cond_vol.loc[aligned.index]
-        residuals[col] = resid
+        mu = float(res.params.get("mu", 0.0)) / 100.0
+        # Standardized residuals: eps_hat_t = (Q_t - mu_hat) / sigma_hat_t.
+        std_resid = resid / cond_vol.replace(0.0, np.nan)
+        std_resid = std_resid.replace([np.inf, -np.inf], np.nan)
+        std_resid = std_resid.dropna()
+        residuals[col] = std_resid
         sigma[col] = cond_vol
+        if return_filter and not cond_vol.empty:
+            filter_meta[col] = {
+                "mu": mu,
+                "sigma_last": float(cond_vol.iloc[-1]),
+                "timestamp_last": pd.Timestamp(cond_vol.index[-1]).isoformat(),
+                "dist": dist,
+            }
 
     residuals_df = pd.DataFrame(residuals)
     sigma_df = pd.DataFrame(sigma)
+    if return_filter:
+        return residuals_df, sigma_df, filter_meta
     return residuals_df, sigma_df
 
 

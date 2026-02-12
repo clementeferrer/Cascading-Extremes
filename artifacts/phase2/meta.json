@@ -80,5 +80,6 @@
   },
   "u_meta": {
     "tau": 0.9800000190734863
-  }
+  },
+  "preprocess_space": "standardized_residuals"
 }
