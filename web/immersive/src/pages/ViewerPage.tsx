@@ -51,6 +51,7 @@ export default function ViewerPage() {
   const [runs, setRuns] = useState<{ run_id: string; source?: string; assets?: string[] }[]>([]);
   const [activeRun, setActiveRun] = useState<string>("");
   const [realRunId, setRealRunId] = useState<string>("");
+  const [generativeRunId, setGenerativeRunId] = useState<string>("");
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [metrics, setMetrics] = useState<MetricsRecord[]>([]);
   const [timeScale, setTimeScale] = useState<number>(1);
@@ -163,13 +164,22 @@ export default function ViewerPage() {
     }
     console.info(`[RUN] loading: ${activeRun}`);
     (async () => {
-      setReturnsLoading(true);
-      setReturnsError(null);
+      const shouldLoadReturns = mode === "real";
+      if (shouldLoadReturns) {
+        setReturnsLoading(true);
+        setReturnsError(null);
+      } else {
+        setReturnsData(null);
+        setReturnsLoading(false);
+        setReturnsError(null);
+      }
 
       try {
-        const returnsPromise = getRunReturns(activeRun)
-          .then((payload) => ({ payload, error: null as string | null }))
-          .catch((err) => ({ payload: null, error: err instanceof Error ? err.message : "Unknown error" }));
+        const returnsPromise = shouldLoadReturns
+          ? getRunReturns(activeRun)
+              .then((payload) => ({ payload, error: null as string | null }))
+              .catch((err) => ({ payload: null, error: err instanceof Error ? err.message : "Unknown error" }))
+          : Promise.resolve({ payload: null, error: null as string | null });
 
         const [metaResp, ev, mt, ret] = await Promise.all([
           getMeta(activeRun),
@@ -199,15 +209,15 @@ export default function ViewerPage() {
         setTimeScale(scale);
         setEvents(evScaled);
         setMetrics(mtScaled);
-        if (ret.payload) {
+        if (!isGenerative && ret.payload) {
           setReturnsData(ret.payload);
           setReturnsError(null);
-        } else if (ret.error) {
+        } else if (!isGenerative && ret.error) {
           setReturnsData(null);
           setReturnsError(`Returns panel unavailable (${ret.error}).`);
         } else {
           setReturnsData(null);
-          setReturnsError("Returns panel unavailable for this run.");
+          setReturnsError(null);
         }
         const horizonClamp =
           isGenerative && generativeHorizon != null ? Math.min(maxTimeScaled, generativeHorizon) : maxTimeScaled;
@@ -358,10 +368,68 @@ export default function ViewerPage() {
     return 0.18;
   }, [pointSize]);
 
-  const panelData = returnsData;
-  const panelLoading = returnsLoading;
-  const panelError = returnsError;
-  const panelEventOnly = panelData?.series_mode === "generative_event_only_fallback";
+  const generativeReturnsData = useMemo<RunReturnsResponse | null>(() => {
+    if (mode !== "generative") return null;
+    if (!events.length) return null;
+    const assets = (meta?.assets && meta.assets.length ? meta.assets : ["BTC-USD", "ETH-USD", "BNB-USD"]).slice(0, 3);
+    const ordered = [...events].sort((a, b) => a.t - b.t);
+    const series: Record<string, [number, number][]> = {};
+    const extremePoints: Record<string, [number, number][]> = {};
+    const assetIndex = new Map<string, number>();
+    assets.forEach((asset, idx) => {
+      const key = asset.trim().toUpperCase();
+      assetIndex.set(key, idx);
+      if (key.endsWith("-USD")) assetIndex.set(key.slice(0, -4), idx);
+    });
+
+    assets.forEach((asset, idx) => {
+      const arr: [number, number][] = [];
+      for (const ev of ordered) {
+        const w = ev.w?.[idx] ?? 0;
+        const mag = ev.mag ?? 0;
+        const value = w * mag;
+        if (Number.isFinite(value) && Number.isFinite(ev.t)) {
+          arr.push([ev.t, value]);
+        }
+      }
+      series[asset] = arr;
+      extremePoints[asset] = [];
+    });
+
+    for (const ev of ordered) {
+      const label = String(ev.asset ?? "").trim().toUpperCase();
+      const idx =
+        assetIndex.get(label) ??
+        (label.endsWith("-USD") ? assetIndex.get(label.slice(0, -4)) : assetIndex.get(`${label}-USD`));
+      if (idx == null) continue;
+      const asset = assets[idx];
+      const w = ev.w?.[idx] ?? 0;
+      const mag = ev.mag ?? 0;
+      const value = w * mag;
+      if (Number.isFinite(value) && Number.isFinite(ev.t)) {
+        extremePoints[asset].push([ev.t, value]);
+      }
+    }
+
+    return {
+      run_id: activeRun || generativeRunId || "generative",
+      units: "log_return_pct",
+      assets,
+      series,
+      extreme_points: extremePoints,
+      alignment: {
+        method: "event_only_projection_rw",
+        offset_hours: 0,
+        candidate_count: ordered.length,
+        start_datetime_utc: null,
+      },
+      count: ordered.length,
+    };
+  }, [mode, events, meta?.assets, activeRun, generativeRunId]);
+
+  const panelData = mode === "real" ? returnsData : generativeReturnsData;
+  const panelLoading = mode === "real" ? returnsLoading : false;
+  const panelError = mode === "real" ? returnsError : null;
 
   const viewOptions = useMemo(() => {
     return runs
@@ -401,6 +469,7 @@ export default function ViewerPage() {
       }
       const updatedRuns = await getRuns();
       setRuns(updatedRuns);
+      setGenerativeRunId(res.run_id!);
       setGenerativeHorizon(horizonHours);
       setGenerativeRunReady(true);
       setActiveRun(res.run_id!);
@@ -549,7 +618,7 @@ export default function ViewerPage() {
                     timeScale={timeScale}
                     highlightPositiveOctant={highlightPositiveOctant}
                     highlightNegativeOctant={highlightNegativeOctant}
-                    eventOnly={panelEventOnly}
+                    eventOnly={mode === "generative"}
                     loading={panelLoading}
                     error={panelError}
                   />

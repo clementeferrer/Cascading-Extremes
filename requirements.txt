@@ -15,4 +15,3 @@ pydantic
 ruff
 black
 pytest
-pypots==1.1

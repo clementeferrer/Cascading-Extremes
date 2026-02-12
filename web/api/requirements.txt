@@ -6,4 +6,3 @@ pandas
 pyarrow
 torch
 pyyaml
-pypots==1.1
