@@ -73,6 +73,7 @@ ARTIFACTS_DIR = ROOT_DIR / "artifacts"
 CONFIGS_DIR = ROOT_DIR / "configs"
 RUNS_DIR = ARTIFACTS_DIR / "runs"
 RUNS_DIR.mkdir(parents=True, exist_ok=True)
+PHASE2_META_PATH = ARTIFACTS_DIR / "phase2" / "meta.json"
 
 
 def _resolve_config_path(config_path: str) -> Path:
@@ -91,6 +92,59 @@ def _laplace_quantile(u: np.ndarray) -> np.ndarray:
     """Inverse CDF of standard Laplace used by return-to-margin mapping."""
     centered = u - 0.5
     return -np.sign(centered) * np.log(np.maximum(1.0 - 2.0 * np.abs(centered), 1e-15))
+
+
+def _normalize_symbol(symbol: str) -> str:
+    return symbol.strip().upper().replace("_", "-")
+
+
+def _load_phase2_symbols(default_symbols: Optional[list[str]] = None) -> list[str]:
+    if PHASE2_META_PATH.exists():
+        try:
+            payload = json.loads(PHASE2_META_PATH.read_text(encoding="utf-8"))
+            symbols = payload.get("symbols")
+            if isinstance(symbols, list) and all(isinstance(s, str) for s in symbols):
+                return [str(s) for s in symbols]
+        except Exception:
+            pass
+    return list(default_symbols or [])
+
+
+def _build_permutation(src_symbols: list[str], dst_symbols: list[str]) -> Optional[list[int]]:
+    src_norm = [_normalize_symbol(s) for s in src_symbols]
+    dst_norm = [_normalize_symbol(s) for s in dst_symbols]
+    idx: list[int] = []
+    for symbol in dst_norm:
+        if symbol in src_norm:
+            idx.append(src_norm.index(symbol))
+            continue
+        if symbol.endswith("-USD") and symbol[:-4] in src_norm:
+            idx.append(src_norm.index(symbol[:-4]))
+            continue
+        with_usd = f"{symbol}-USD"
+        if with_usd in src_norm:
+            idx.append(src_norm.index(with_usd))
+            continue
+        return None
+    return idx
+
+
+def _reorder_w_columns(W: np.ndarray, src_symbols: list[str], dst_symbols: list[str]) -> np.ndarray:
+    if W.ndim != 2 or not src_symbols or not dst_symbols:
+        return W
+    perm = _build_permutation(src_symbols, dst_symbols)
+    if perm is None or len(perm) != W.shape[1]:
+        return W
+    return W[:, perm]
+
+
+def _reorder_vector(vec: np.ndarray, src_symbols: list[str], dst_symbols: list[str]) -> np.ndarray:
+    if vec.ndim != 1 or not src_symbols or not dst_symbols:
+        return vec
+    perm = _build_permutation(src_symbols, dst_symbols)
+    if perm is None or len(perm) != vec.shape[0]:
+        return vec
+    return vec[perm]
 
 
 def _latest_real_run_id() -> Optional[str]:
@@ -280,6 +334,8 @@ def generate_continue(req: GenerateRequest):
 
     cfg_path = _resolve_config_path("configs/phase2.yaml")
     cfg = load_config(str(cfg_path))
+    cfg_symbols = [str(s) for s in cfg.get("data", {}).get("symbols", [])]
+    model_symbols = _load_phase2_symbols(default_symbols=cfg_symbols)
     model = load_model_p2(str(p2_model_path))
     model.to("cpu")
     model.eval()
@@ -295,6 +351,9 @@ def generate_continue(req: GenerateRequest):
         np.sin(phi) * np.sin(theta),
         np.cos(phi),
     ], dtype=np.float32)
+    # User-facing spherical controls follow cfg asset ordering (typically BTC, ETH, BNB).
+    # Convert to model internal ordering when they differ.
+    w0 = _reorder_vector(w0, cfg_symbols, model_symbols).astype(np.float32)
     # Normalize (safety)
     norm = np.linalg.norm(w0)
     if norm > 1e-8:
@@ -341,7 +400,8 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
 
         # Load CDFs
         cdf_data = np.load(str(cdfs_path))
-        asset_order = sorted(str(a) for a in cdf_data.files)
+        # CDF file order matches the model's training column order.
+        asset_order = [str(a) for a in cdf_data.files]
 
         # Convert % returns to Laplace margins
         X_vals = []
@@ -370,6 +430,8 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
         # Load quantile model and check threshold
         cfg_path = _resolve_config_path("configs/phase2.yaml")
         cfg = load_config(str(cfg_path))
+        cfg_symbols = [str(s) for s in cfg.get("data", {}).get("symbols", [])]
+        model_symbols = _load_phase2_symbols(default_symbols=asset_order)
         model = load_model_p2(str(p2_model_path))
         model.to("cpu")
         model.eval()
@@ -399,8 +461,12 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
             temperature=req.temperature,
             prompt=prompt,
         )
+        # Keep internal simulation in model order, but export in cfg/UI order
+        # so labels and controls remain aligned (BTC/ETH/BNB).
+        sim_export = dict(sim)
+        sim_export["W"] = _reorder_w_columns(np.asarray(sim["W"], dtype=np.float32), model_symbols, cfg_symbols)
         run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ_gen")
-        export_run_from_arrays(str(cfg_path), run_id, "generative", sim, output_dir=str(RUNS_DIR))
+        export_run_from_arrays(str(cfg_path), run_id, "generative", sim_export, output_dir=str(RUNS_DIR))
         return {"extreme": True, "run_id": run_id}
 
     except HTTPException:
