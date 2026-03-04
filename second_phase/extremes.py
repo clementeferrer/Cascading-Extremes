@@ -59,6 +59,26 @@ class SphericalQuantileMLP(nn.Module):
         return torch.cat(parts, dim=-1)
 
 
+class ConstantThreshold:
+    """Drop-in replacement for SphericalQuantileMLP that returns a fixed scalar.
+
+    Matches the callable interface: __call__(W_tensor) -> u_tensor.
+    """
+
+    def __init__(self, u: float):
+        self.u = u
+
+    def __call__(self, W):
+        if isinstance(W, np.ndarray):
+            return np.full(W.shape[0], self.u, dtype=W.dtype)
+        return torch.full((W.shape[0],), self.u, dtype=W.dtype)
+
+
+def compute_global_threshold(R: np.ndarray, tau: float) -> float:
+    """Simple global quantile threshold: u = quantile(R, tau)."""
+    return float(np.quantile(R, tau))
+
+
 def pinball_loss(y: torch.Tensor, y_hat: torch.Tensor, tau: float) -> torch.Tensor:
     diff = y - y_hat
     return torch.maximum(tau * diff, (tau - 1.0) * diff).mean()

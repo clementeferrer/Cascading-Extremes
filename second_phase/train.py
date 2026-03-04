@@ -20,7 +20,12 @@ from second_phase.dataset import (
     build_events_sphere,
     compute_radial_angular_l2,
 )
-from second_phase.extremes import QuantileModelConfig, fit_sphere_threshold
+from second_phase.extremes import (
+    QuantileModelConfig,
+    ConstantThreshold,
+    compute_global_threshold,
+    fit_sphere_threshold,
+)
 from second_phase.model import SphericalCascadeTransformer, ModelConfig
 from second_phase.preprocess import compute_log_returns, fit_garch, standardize_laplace
 from second_phase.utils import load_config, save_json, seed_all, ensure_dir
@@ -40,10 +45,17 @@ def split_events(events: Dict[str, np.ndarray], split: Tuple[float, float, float
     return subset(idx_train), subset(idx_val), subset(idx_test)
 
 
-def train_loop(model, loader, optimizer, device, subcrit_weight: float = 0.0):
+def _default_loss_weights():
+    return {"direction": 1.0, "magnitude": 1.0, "time": 1.0}
+
+
+def train_loop(model, loader, optimizer, device, subcrit_weight: float = 0.0, loss_weights=None):
     model.train()
     total_loss = 0.0
+    comp_sums = {"log_p_w": 0.0, "log_p_r": 0.0, "log_p_t": 0.0}
     count = 0
+    lw = loss_weights or _default_loss_weights()
+    w_dir, w_mag, w_time = lw["direction"], lw["magnitude"], lw["time"]
     for batch in loader:
         tokens = batch["tokens"].to(device)
         W = batch["W"].to(device)
@@ -62,7 +74,7 @@ def train_loop(model, loader, optimizer, device, subcrit_weight: float = 0.0):
         W_in = W[:, :-1, :]
 
         out = model.log_likelihood(tokens_in, W_next, R_next, dT_next, T_in, R_in, u_next, W_in=W_in)
-        loglik = out["log_p_w"] + out["log_p_r"] + out["log_p_t"]
+        loglik = w_dir * out["log_p_w"] + w_mag * out["log_p_r"] + w_time * out["log_p_t"]
         loss = -loglik.mean() + subcrit_weight * out["subcrit_penalty"]
 
         if torch.isnan(loss) or torch.isinf(loss):
@@ -74,15 +86,23 @@ def train_loop(model, loader, optimizer, device, subcrit_weight: float = 0.0):
         optimizer.step()
 
         total_loss += loss.item()
+        comp_sums["log_p_w"] += out["log_p_w"].mean().item()
+        comp_sums["log_p_r"] += out["log_p_r"].mean().item()
+        comp_sums["log_p_t"] += out["log_p_t"].mean().item()
         count += 1
 
-    return total_loss / max(count, 1)
+    n = max(count, 1)
+    components = {k: v / n for k, v in comp_sums.items()}
+    return total_loss / n, components
 
 
-def eval_loop(model, loader, device, subcrit_weight: float = 0.0):
+def eval_loop(model, loader, device, subcrit_weight: float = 0.0, loss_weights=None):
     model.eval()
     total_loss = 0.0
+    comp_sums = {"log_p_w": 0.0, "log_p_r": 0.0, "log_p_t": 0.0}
     count = 0
+    lw = loss_weights or _default_loss_weights()
+    w_dir, w_mag, w_time = lw["direction"], lw["magnitude"], lw["time"]
     with torch.no_grad():
         for batch in loader:
             tokens = batch["tokens"].to(device)
@@ -102,13 +122,18 @@ def eval_loop(model, loader, device, subcrit_weight: float = 0.0):
             W_in = W[:, :-1, :]
 
             out = model.log_likelihood(tokens_in, W_next, R_next, dT_next, T_in, R_in, u_next, W_in=W_in)
-            loglik = out["log_p_w"] + out["log_p_r"] + out["log_p_t"]
+            loglik = w_dir * out["log_p_w"] + w_mag * out["log_p_r"] + w_time * out["log_p_t"]
             loss = -loglik.mean() + subcrit_weight * out["subcrit_penalty"]
 
             total_loss += loss.item()
+            comp_sums["log_p_w"] += out["log_p_w"].mean().item()
+            comp_sums["log_p_r"] += out["log_p_r"].mean().item()
+            comp_sums["log_p_t"] += out["log_p_t"].mean().item()
             count += 1
 
-    return total_loss / max(count, 1)
+    n = max(count, 1)
+    components = {k: v / n for k, v in comp_sums.items()}
+    return total_loss / n, components
 
 
 def fit(cfg: Dict, events: Optional[Dict[str, np.ndarray]] = None):
@@ -133,34 +158,53 @@ def fit(cfg: Dict, events: Optional[Dict[str, np.ndarray]] = None):
         timestamps = X.index
 
         R_all, W_all = compute_radial_angular_l2(X.values, eps=cfg["extremes"].get("eps", 1e-8))
-        q_cfg = QuantileModelConfig(**cfg["extremes"]["quantile_model"])
-        u_tau_fn, u_meta, q_model = fit_sphere_threshold(
-            W_all,
-            R_all,
-            tau=cfg["extremes"]["tau"],
-            config=q_cfg,
-            device=cfg["train"].get("device", "cpu"),
-        )
+
+        threshold_mode = cfg["extremes"].get("threshold_mode", "directional")
+
+        if threshold_mode == "global":
+            # Global scalar threshold: u = quantile(R, tau)
+            u_global = compute_global_threshold(R_all, cfg["extremes"]["tau"])
+            u_tau_fn = ConstantThreshold(u_global)
+            print(f"[global threshold] u_tau = {u_global:.4f}")
+        else:
+            # Directional threshold via SphericalQuantileMLP
+            q_cfg = QuantileModelConfig(**cfg["extremes"]["quantile_model"])
+            u_tau_fn, u_meta, q_model = fit_sphere_threshold(
+                W_all,
+                R_all,
+                tau=cfg["extremes"]["tau"],
+                config=q_cfg,
+                device=cfg["train"].get("device", "cpu"),
+            )
 
         events = build_events_sphere(X, timestamps, u_tau_fn, eps=cfg["extremes"].get("eps", 1e-8))
 
-        processed_dir = ensure_dir("data/processed_phase2")
+        processed_dir = ensure_dir(cfg.get("processed_dir", "data/processed_phase2"))
         np.savez(Path(processed_dir) / "events.npz", **events)
 
         np.savez(
             Path(artifact_dir) / "cdfs.npz",
             **{k: v.sorted_values for k, v in cdfs.items()},
         )
-        torch.save(q_model.state_dict(), Path(artifact_dir) / "quantile_model.pt")
-        save_json(
-            str(Path(artifact_dir) / "meta.json"),
-            {
-                "symbols": list(prices.columns),
-                "tau": cfg["extremes"]["tau"],
-                "config": cfg,
-                "u_meta": {"tau": float(u_meta["tau"][0])},
-            },
-        )
+
+        # Save bulk observations (R * W positions for all data points)
+        positions = (R_all[:, None] * W_all).astype(np.float32)
+        np.savez(Path(artifact_dir) / "bulk_observations.npz", positions=positions)
+
+        meta = {
+            "symbols": list(prices.columns),
+            "tau": cfg["extremes"]["tau"],
+            "threshold_mode": threshold_mode,
+            "config": cfg,
+        }
+
+        if threshold_mode == "global":
+            meta["u_global"] = u_global
+        else:
+            torch.save(q_model.state_dict(), Path(artifact_dir) / "quantile_model.pt")
+            meta["u_meta"] = {"tau": float(u_meta["tau"][0])}
+
+        save_json(str(Path(artifact_dir) / "meta.json"), meta)
 
     split_ratios = tuple(cfg["dataset"]["split"])
     train_events, val_events, test_events = split_events(events, split_ratios)
@@ -196,13 +240,36 @@ def fit(cfg: Dict, events: Optional[Dict[str, np.ndarray]] = None):
         weight_decay=cfg["train"]["weight_decay"],
     )
     subcrit_weight = cfg["train"].get("subcrit_weight", 0.1)
+    loss_weights = cfg["train"].get("loss_weights", _default_loss_weights())
+
+    # Optional LR scheduler
+    scheduler = None
+    sched_type = cfg["train"].get("scheduler")
+    if sched_type == "cosine":
+        from torch.optim.lr_scheduler import CosineAnnealingLR
+        lr_min = cfg["train"].get("lr_min", 1e-6)
+        scheduler = CosineAnnealingLR(optimizer, T_max=cfg["train"]["epochs"], eta_min=lr_min)
 
     best_val = float("inf")
     metrics = []
     for epoch in range(cfg["train"]["epochs"]):
-        train_loss = train_loop(model, train_loader, optimizer, device, subcrit_weight)
-        val_loss = eval_loop(model, val_loader, device, subcrit_weight)
-        metrics.append({"epoch": epoch + 1, "train_loss": train_loss, "val_loss": val_loss})
+        train_loss, train_comp = train_loop(model, train_loader, optimizer, device, subcrit_weight, loss_weights)
+        val_loss, val_comp = eval_loop(model, val_loader, device, subcrit_weight, loss_weights)
+        if scheduler is not None:
+            scheduler.step()
+        metrics.append({
+            "epoch": epoch + 1,
+            "train_loss": train_loss,
+            "val_loss": val_loss,
+            "train_components": train_comp,
+            "val_components": val_comp,
+        })
+        if (epoch + 1) % 10 == 0 or epoch == 0:
+            lr_now = optimizer.param_groups[0]["lr"]
+            print(
+                f"  [epoch {epoch+1:3d}] train={train_loss:.4f} val={val_loss:.4f} lr={lr_now:.2e} | "
+                f"w={train_comp['log_p_w']:.3f} r={train_comp['log_p_r']:.3f} t={train_comp['log_p_t']:.3f}"
+            )
         if val_loss < best_val:
             best_val = val_loss
             torch.save(

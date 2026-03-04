@@ -5,7 +5,7 @@
     "ETH-USD"
   ],
   "tau": 0.95,
-  "threshold_mode": "directional",
+  "threshold_mode": "global",
   "config": {
     "data": {
       "symbols": [
@@ -26,6 +26,7 @@
     "extremes": {
       "tau": 0.95,
       "eps": 1e-08,
+      "threshold_mode": "global",
       "quantile_model": {
         "hidden_sizes": [
           64,
@@ -75,13 +76,11 @@
       "seed_len": 20,
       "safety_factor": 1.5
     },
-    "artifact_dir": "artifacts/phase2",
-    "processed_dir": "data/processed_phase2",
+    "artifact_dir": "artifacts/phase2_global",
+    "processed_dir": "data/processed_phase2_global",
     "viz": {
-      "default_checkpoint": "artifacts/phase2/model.pt"
+      "default_checkpoint": "artifacts/phase2_global/model.pt"
     }
   },
-  "u_meta": {
-    "tau": 0.949999988079071
-  }
+  "u_global": 0.5457868811567725
 }

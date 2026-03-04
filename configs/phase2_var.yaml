@@ -1,13 +1,20 @@
 data:
   symbols:
-    - BTC-USD
-    - ETH-USD
-    - BNB-USD
+    - VAR-1
+    - VAR-2
+    - VAR-3
   period: "730d"
   interval: "1h"
   cache_dir: "data/raw"
   price_field: "Close"
   timezone: "UTC"
+
+var:
+  n_obs: 17520
+  d: 3
+  df: 3.0
+  seed: 42
+  # A and Sigma use defaults from var_generate.py if omitted
 
 preprocess:
   garch_dist: "t"
@@ -31,8 +38,8 @@ model:
   d_model: 128
   nhead: 4
   num_layers: 4
-  dropout: 0.15
-  vmf_components: 6
+  dropout: 0.1
+  vmf_components: 8
   hawkes_hidden: 64
   gauge_hidden: 64
   attenuation_hidden: 32
@@ -41,15 +48,22 @@ model:
   tau_min: 1.0
   subcrit_margin: 0.95
   context_shape: true
+  shape_hidden: 64
 
 train:
-  lr: 1.0e-4
+  lr: 3.0e-4
   batch_size: 16
-  epochs: 150
-  weight_decay: 5.0e-4
+  epochs: 200
+  weight_decay: 1.0e-4
   seed: 42
   device: "cpu"
-  subcrit_weight: 0.1
+  subcrit_weight: 0.05
+  loss_weights:
+    direction: 1.0
+    magnitude: 1.0
+    time: 1.0
+  scheduler: "cosine"
+  lr_min: 1.0e-6
 
 simulate:
   horizon_events: 200
@@ -57,8 +71,7 @@ simulate:
   seed_len: 20
   safety_factor: 1.5
 
-artifact_dir: "artifacts/phase2"
-processed_dir: "data/processed_phase2"
+artifact_dir: "artifacts/phase2_var"
 
 viz:
-  default_checkpoint: "artifacts/phase2/model.pt"
+  default_checkpoint: "artifacts/phase2_var/model.pt"

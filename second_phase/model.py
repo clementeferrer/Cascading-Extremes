@@ -5,10 +5,21 @@ truncated Gamma magnitude, Hawkes + attenuation time head, and subcriticality pe
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
+import numpy as np
 import torch
 from torch import nn
 
 from second_phase.utils import log_vmf_normalizing
+
+
+def _sinusoidal_encoding(max_len: int, d_model: int) -> torch.Tensor:
+    """Standard sinusoidal positional encoding (Vaswani et al. 2017)."""
+    pos = torch.arange(max_len).unsqueeze(1).float()
+    div = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
+    pe = torch.zeros(max_len, d_model)
+    pe[:, 0::2] = torch.sin(pos * div)
+    pe[:, 1::2] = torch.cos(pos * div)
+    return pe
 
 
 @dataclass
@@ -21,10 +32,13 @@ class ModelConfig:
     hawkes_hidden: int = 64
     gauge_hidden: int = 64
     attenuation_hidden: int = 32
-    max_len: int = 256
+    max_len: int = 1024
     a_min: float = 1e-3
     tau_min: float = 1.0  # minimum decay timescale (hours)
     subcrit_margin: float = 0.95
+    context_shape: bool = False
+    shape_hidden: int = 64
+    gauge_dt: bool = False
 
 
 def make_mlp(in_dim: int, hidden: Tuple[int, ...], out_dim: int) -> nn.Sequential:
@@ -55,7 +69,7 @@ class SphericalCascadeTransformer(nn.Module):
 
         # Encoder
         self.input_proj = nn.Linear(d_input, cfg.d_model)
-        self.pos_emb = nn.Parameter(torch.zeros(cfg.max_len, cfg.d_model))
+        self.pos_emb = nn.Parameter(_sinusoidal_encoding(cfg.max_len, cfg.d_model))
 
         layer = nn.TransformerEncoderLayer(
             d_model=cfg.d_model,
@@ -74,8 +88,12 @@ class SphericalCascadeTransformer(nn.Module):
         self.kappa_head = nn.Linear(cfg.d_model, K)
 
         # ---- Magnitude head ----
-        self.gauge_net = make_mlp(cfg.d_model + 1 + d_assets, (cfg.gauge_hidden, cfg.gauge_hidden), 1)
-        self.a_param = nn.Parameter(torch.tensor(1.0))
+        gauge_in_dim = cfg.d_model + 1 + d_assets + (1 if cfg.gauge_dt else 0)
+        self.gauge_net = make_mlp(gauge_in_dim, (cfg.gauge_hidden, cfg.gauge_hidden), 1)
+        if cfg.context_shape:
+            self.shape_net = make_mlp(cfg.d_model + d_assets, (cfg.shape_hidden, cfg.shape_hidden), 1)
+        else:
+            self.a_param = nn.Parameter(torch.tensor(1.0))
 
         # ---- Time head: Hawkes with attenuation ----
         self.mu_net = make_mlp(cfg.d_model, (cfg.hawkes_hidden, cfg.hawkes_hidden), 1)
@@ -127,8 +145,20 @@ class SphericalCascadeTransformer(nn.Module):
     # Magnitude head
     # ------------------------------------------------------------------
 
-    def gauge_rate(self, h: torch.Tensor, log_r: torch.Tensor, w_next: torch.Tensor) -> torch.Tensor:
-        x = torch.cat([h, log_r.unsqueeze(-1), w_next], dim=-1)
+    def gauge_rate(
+        self,
+        h: torch.Tensor,
+        log_r: torch.Tensor,
+        w_next: torch.Tensor,
+        log_dt: torch.Tensor = None,
+    ) -> torch.Tensor:
+        parts = [h, log_r.unsqueeze(-1), w_next]
+        if self.cfg.gauge_dt:
+            if log_dt is not None:
+                parts.append(log_dt.unsqueeze(-1))
+            else:
+                parts.append(torch.zeros_like(log_r.unsqueeze(-1)))
+        x = torch.cat(parts, dim=-1)
         rate = self.softplus(self.gauge_net(x)) + self.eps
         return rate.squeeze(-1)
 
@@ -243,16 +273,20 @@ class SphericalCascadeTransformer(nn.Module):
 
         # --- Magnitude (truncated Gamma) ---
         log_r_in = torch.log(R_in + self.eps)
-        rate = self.gauge_rate(h, log_r_in, W_next)
-        shape = self.softplus(self.a_param) + self.cfg.a_min
+        log_dt_in = torch.log(dT_next + self.eps) if self.cfg.gauge_dt else None
+        rate = self.gauge_rate(h, log_r_in, W_next, log_dt=log_dt_in)
+        if self.cfg.context_shape:
+            shape = self.softplus(self.shape_net(torch.cat([h, W_next], dim=-1))).squeeze(-1) + self.cfg.a_min
+        else:
+            shape = self.softplus(self.a_param) + self.cfg.a_min
         log_pdf = (
             shape * torch.log(rate)
             - torch.lgamma(shape)
             + (shape - 1.0) * torch.log(R_next + self.eps)
             - rate * R_next
         )
-        tail = 1.0 - torch.special.gammainc(shape.detach(), (rate.detach() * u_next.detach()))
-        tail = torch.clamp(tail, min=self.eps)
+        tail = 1.0 - torch.special.gammainc(shape.detach(), rate * u_next)
+        tail = torch.clamp(tail, min=1e-4)
         log_p_r = log_pdf - torch.log(tail)
 
         # --- Time (Hawkes + attenuation) ---

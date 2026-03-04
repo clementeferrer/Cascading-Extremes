@@ -9,7 +9,10 @@
 import math
 from typing import Tuple
 
+import numpy as np
 import torch
+from scipy.special import gammainc as _gammainc
+from scipy.stats import gamma as gamma_dist
 from torch import Tensor
 
 from second_phase.utils import log_vmf_normalizing
@@ -129,16 +132,18 @@ def sample_vmf_mixture(pi: Tensor, mu: Tensor, kappa: Tensor, d: int) -> Tensor:
 # Truncated Gamma
 # ---------------------------------------------------------------------------
 
-def sample_trunc_gamma(shape: float, rate: float, u: float, max_tries: int = 512) -> float:
-    """Sample R ~ Gamma(shape, rate) truncated to R > u via rejection."""
-    dist = torch.distributions.Gamma(torch.tensor(shape), torch.tensor(rate))
-    last = u
-    for _ in range(max_tries):
-        r = dist.sample().item()
-        last = r
-        if r > u:
-            return r
-    return max(last, u + 1e-6)
+def sample_trunc_gamma(shape: float, rate: float, u: float) -> float:
+    """Sample R ~ Gamma(shape, rate) truncated to R > u via inverse CDF.
+
+    Uses the exact inverse CDF method: sample uniformly in [CDF(u), 1)
+    and invert through the Gamma quantile function.  No rejection needed.
+    """
+    cdf_u = float(_gammainc(shape, rate * u))        # P(R <= u) (regularized)
+    p = float(np.random.uniform())
+    target_cdf = cdf_u + p * (1.0 - cdf_u)           # uniform in [cdf_u, 1)
+    target_cdf = min(target_cdf, 1.0 - 1e-15)        # numerical safety
+    r = gamma_dist.ppf(target_cdf, shape, scale=1.0 / rate)
+    return max(float(r), u + 1e-8)
 
 
 # ---------------------------------------------------------------------------

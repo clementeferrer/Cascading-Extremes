@@ -16,6 +16,7 @@ preprocess:
 extremes:
   tau: 0.95
   eps: 1.0e-8
+  threshold_mode: "global"
   quantile_model:
     hidden_sizes: [64, 64]
     lr: 1.0e-3
@@ -57,8 +58,8 @@ simulate:
   seed_len: 20
   safety_factor: 1.5
 
-artifact_dir: "artifacts/phase2"
-processed_dir: "data/processed_phase2"
+artifact_dir: "artifacts/phase2_global"
+processed_dir: "data/processed_phase2_global"
 
 viz:
-  default_checkpoint: "artifacts/phase2/model.pt"
+  default_checkpoint: "artifacts/phase2_global/model.pt"

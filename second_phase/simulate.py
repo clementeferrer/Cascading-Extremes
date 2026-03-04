@@ -11,9 +11,9 @@ from typing import Dict, Optional
 import numpy as np
 import torch
 
-from second_phase.dataset import build_token_sphere, spherical_features
+from second_phase.dataset import build_token_sphere, build_tokens_from_arrays, spherical_features
 from second_phase.distributions import sample_trunc_gamma, sample_vmf_mixture
-from second_phase.extremes import SphericalQuantileMLP, QuantileModelConfig
+from second_phase.extremes import SphericalQuantileMLP, QuantileModelConfig, ConstantThreshold
 from second_phase.genealogy import build_genealogy, Genealogy
 from second_phase.model import SphericalCascadeTransformer, ModelConfig
 from second_phase.utils import load_config, ensure_dir
@@ -35,7 +35,7 @@ def load_quantile_model(path: str, d_assets: int, cfg: QuantileModelConfig) -> S
     return model
 
 
-def _encode_history(model, W_list, R_list, dT_list, T_list):
+def _encode_history(model, W_list, R_list, dT_list, T_list, q_model=None):
     """Encode the current event history into transformer hidden states."""
     max_len = model.cfg.max_len
     start = max(0, len(W_list) - max_len)
@@ -45,10 +45,21 @@ def _encode_history(model, W_list, R_list, dT_list, T_list):
     dT_hist = np.array(dT_list[start:], dtype=np.float32)
     T_hist = np.array(T_list[start:], dtype=np.float32)
 
-    tokens = np.stack(
-        [build_token_sphere(W_hist[i], R_hist[i], dT_hist[i]) for i in range(len(W_hist))],
-        axis=0,
-    )
+    # Check model's expected input dimension for backward compat
+    d_input = model.input_proj.in_features
+
+    # Compute thresholds for exceedance feature if q_model available and model expects enriched tokens
+    u_hist = None
+    if q_model is not None and d_input > 14:
+        with torch.no_grad():
+            u_hist = q_model(torch.tensor(W_hist, dtype=torch.float32)).numpy()
+
+    tokens = build_tokens_from_arrays(W_hist, R_hist, dT_hist, u=u_hist)
+
+    # Truncate to model's expected d_input (backward compat with 14-dim models)
+    if tokens.shape[1] > d_input:
+        tokens = tokens[:, :d_input]
+
     tokens_t = torch.tensor(tokens[None, :, :], dtype=torch.float32)
 
     with torch.no_grad():
@@ -72,7 +83,7 @@ def _clamp_temperature(temperature: float) -> float:
     return float(np.clip(temperature, 0.2, 3.0))
 
 
-def _sample_candidate(model, h, R_hist, q_model, d_assets, temperature: float = 1.0):
+def _sample_candidate(model, h, R_hist, q_model, d_assets, temperature: float = 1.0, last_dt: float = 1.0):
     """Sample a candidate mark (W, R) from the model's conditional distributions."""
     temp = _clamp_temperature(temperature)
     with torch.no_grad():
@@ -88,9 +99,13 @@ def _sample_candidate(model, h, R_hist, q_model, d_assets, temperature: float = 
         log_r_in = torch.tensor([[np.log(R_hist[-1] + 1e-8)]], dtype=torch.float32)
         h_last = h[:, -1:, :]
         w_t = torch.tensor(w_next[None, None, :], dtype=torch.float32)
-        rate = model.gauge_rate(h_last, log_r_in, w_t).item()
+        log_dt_in = torch.tensor([[np.log(last_dt + 1e-8)]], dtype=torch.float32) if model.cfg.gauge_dt else None
+        rate = model.gauge_rate(h_last, log_r_in, w_t, log_dt=log_dt_in).item()
         u_next = q_model(torch.tensor(w_next[None, :], dtype=torch.float32)).item()
-        shape = model.softplus(model.a_param).item() + model.cfg.a_min
+        if model.cfg.context_shape:
+            shape = model.softplus(model.shape_net(torch.cat([h_last, w_t], dim=-1))).item() + model.cfg.a_min
+        else:
+            shape = model.softplus(model.a_param).item() + model.cfg.a_min
         r_next = sample_trunc_gamma(shape, rate, u_next)
 
     return w_next, r_next
@@ -161,10 +176,10 @@ def autoregressive_generate(
         horizon_end = float(max_time)
 
     for _ in range(max_events_cap):
-        h, tokens_t, W_hist, R_hist, T_hist = _encode_history(model, W, R, dT_list, T)
+        h, tokens_t, W_hist, R_hist, T_hist = _encode_history(model, W, R, dT_list, T, q_model=q_model)
 
         # 1. Sample next mark (direction + magnitude)
-        w_next, r_next = _sample_candidate(model, h, R, q_model, d_assets, temperature=temperature)
+        w_next, r_next = _sample_candidate(model, h, R, q_model, d_assets, temperature=temperature, last_dt=dT_list[-1])
 
         # 2. Sample timing from Hawkes intensity: dT ~ Exp(lambda)
         lam, psi = _compute_intensity(model, h, T_hist, R_hist, W_hist)
@@ -237,7 +252,7 @@ def ogata_thinning(
     t0 = T[-1] if T else 0.0
 
     for _ in range(max_events):
-        h, tokens_t, W_hist, R_hist, T_hist = _encode_history(model, W, R, dT, T)
+        h, tokens_t, W_hist, R_hist, T_hist = _encode_history(model, W, R, dT, T, q_model=q_model)
         lam_current, _ = _compute_intensity(model, h, T_hist, R_hist, W_hist)
 
         # Upper bound for thinning
@@ -251,7 +266,7 @@ def ogata_thinning(
             break
 
         # Sample candidate mark
-        w_candidate, r_candidate = _sample_candidate(model, h, R_hist, q_model, d_assets)
+        w_candidate, r_candidate = _sample_candidate(model, h, R_hist, q_model, d_assets, last_dt=dT[-1] if dT else 1.0)
 
         # Temporarily add candidate to compute intensity at proposed time
         W_temp = W + [w_candidate]
@@ -260,7 +275,7 @@ def ogata_thinning(
         T_temp = T + [t_proposed]
 
         h_temp, _, W_hist_temp, R_hist_temp, T_hist_temp = _encode_history(
-            model, W_temp, R_temp, dT_temp, T_temp
+            model, W_temp, R_temp, dT_temp, T_temp, q_model=q_model
         )
         lam_at_candidate, _ = _compute_intensity(model, h_temp, T_hist_temp, R_hist_temp, W_hist_temp)
 
@@ -299,11 +314,14 @@ def generate_with_genealogy(
     events = ogata_thinning(seed, max_events, max_time, model, q_model, safety_factor)
 
     # Compute full intensity decomposition for genealogy
-    tokens = np.stack(
-        [build_token_sphere(events["W"][i], events["R"][i], events["dT"][i])
-         for i in range(len(events["W"]))],
-        axis=0,
-    )
+    d_input = model.input_proj.in_features
+    u_vals = None
+    if d_input > 14:
+        with torch.no_grad():
+            u_vals = q_model(torch.tensor(events["W"], dtype=torch.float32)).numpy()
+    tokens = build_tokens_from_arrays(events["W"], events["R"], events["dT"], u=u_vals)
+    if tokens.shape[1] > d_input:
+        tokens = tokens[:, :d_input]
     tokens_t = torch.tensor(tokens[None, :, :], dtype=torch.float32)
 
     with torch.no_grad():
@@ -375,14 +393,26 @@ def main() -> None:
     artifact_dir = cfg.get("artifact_dir", "artifacts/phase2")
 
     model = load_model(str(Path(artifact_dir) / "model.pt"))
-    q_cfg = QuantileModelConfig(**cfg["extremes"]["quantile_model"])
-    q_model = load_quantile_model(
-        str(Path(artifact_dir) / "quantile_model.pt"),
-        model.d_assets,
-        q_cfg,
-    )
 
-    events_path = Path("data/processed_phase2/events.npz")
+    threshold_mode = cfg["extremes"].get("threshold_mode", "directional")
+    if threshold_mode == "global":
+        import json
+        meta_path = Path(artifact_dir) / "meta.json"
+        with open(meta_path) as f:
+            meta = json.load(f)
+        u_global = meta["u_global"]
+        q_model = ConstantThreshold(u_global)
+        print(f"[global threshold] u_tau = {u_global:.4f}")
+    else:
+        q_cfg = QuantileModelConfig(**cfg["extremes"]["quantile_model"])
+        q_model = load_quantile_model(
+            str(Path(artifact_dir) / "quantile_model.pt"),
+            model.d_assets,
+            q_cfg,
+        )
+
+    processed_dir = cfg.get("processed_dir", "data/processed_phase2")
+    events_path = Path(processed_dir) / "events.npz"
     events = np.load(events_path)
     seed_len = cfg["simulate"]["seed_len"]
     seed = {k: events[k][-seed_len:] for k in ["W", "R", "dT", "T"]}

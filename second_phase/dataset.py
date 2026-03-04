@@ -36,10 +36,67 @@ def spherical_features(W: np.ndarray) -> np.ndarray:
     return np.concatenate(parts, axis=1)
 
 
-def build_token_sphere(w: np.ndarray, r: float, dt: float, eps: float = 1e-8) -> np.ndarray:
-    """Build a single token: [W, xi(W), log R, log dT]."""
+def build_token_sphere(
+    w: np.ndarray,
+    r: float,
+    dt: float,
+    eps: float = 1e-8,
+    prev_w: np.ndarray = None,
+    prev_r: float = None,
+    u_val: float = None,
+) -> np.ndarray:
+    """Build a single token: [W, xi(W), log R, log dT, momentum, similarity, exceedance].
+
+    The last three features are optional enrichment (17 dims for d=3):
+    - momentum: log(R_i) - log(R_{i-1})   (0 if no prev)
+    - similarity: W_i . W_{i-1}            (0 if no prev)
+    - exceedance: log(R_i - u_tau(W_i) + eps)  (0 if no u_val)
+    """
     xi = spherical_features(w[None, :])[0]
-    return np.concatenate([w, xi, [np.log(r + eps), np.log(dt + eps)]], axis=0)
+    log_r = np.log(r + eps)
+    log_dt = np.log(dt + eps)
+    momentum = (log_r - np.log(prev_r + eps)) if prev_r is not None else 0.0
+    similarity = float(np.dot(w, prev_w)) if prev_w is not None else 0.0
+    exceedance = np.log(max(r - u_val, eps)) if u_val is not None else 0.0
+    return np.concatenate([w, xi, [log_r, log_dt, momentum, similarity, exceedance]], axis=0)
+
+
+def build_tokens_from_arrays(
+    W: np.ndarray,
+    R: np.ndarray,
+    dT: np.ndarray,
+    u: np.ndarray = None,
+    eps: float = 1e-8,
+) -> np.ndarray:
+    """Vectorized token builder for arrays of events.
+
+    Returns (n, 17) tokens for d=3 with enrichment features:
+    [W, xi(W), log R, log dT, momentum, similarity, exceedance].
+    """
+    n = len(R)
+    xi = spherical_features(W).astype(np.float32)
+    log_r = np.log(R + eps)[:, None]
+    log_dt = np.log(dT + eps)[:, None]
+
+    # Magnitude momentum: log(R_i) - log(R_{i-1}), 0 for first event
+    momentum = np.zeros((n, 1), dtype=np.float32)
+    if n > 1:
+        momentum[1:, 0] = np.log(R[1:] + eps) - np.log(R[:-1] + eps)
+
+    # Directional similarity: W_i . W_{i-1}, 0 for first event
+    similarity = np.zeros((n, 1), dtype=np.float32)
+    if n > 1:
+        similarity[1:, 0] = np.sum(W[1:] * W[:-1], axis=1)
+
+    # Exceedance margin: log(R_i - u_tau(W_i) + eps), 0 if no threshold
+    exceedance = np.zeros((n, 1), dtype=np.float32)
+    if u is not None:
+        exceedance[:, 0] = np.log(np.maximum(R - u, eps))
+
+    return np.concatenate(
+        [W, xi, log_r, log_dt, momentum, similarity, exceedance],
+        axis=1,
+    ).astype(np.float32)
 
 
 def build_events_sphere(
@@ -81,17 +138,7 @@ def build_events_sphere(
     dT = np.diff(T, prepend=T[0])
     dT[0] = np.median(dT[1:]) if len(dT) > 1 else 1.0
 
-    xi_e = spherical_features(W_e).astype(np.float32)
-
-    tokens = np.concatenate(
-        [
-            W_e,
-            xi_e,
-            np.log(R_e + eps)[:, None],
-            np.log(dT + eps)[:, None],
-        ],
-        axis=1,
-    ).astype(np.float32)
+    tokens = build_tokens_from_arrays(W_e, R_e, dT, u=u_e, eps=eps)
 
     return {
         "T": T,
