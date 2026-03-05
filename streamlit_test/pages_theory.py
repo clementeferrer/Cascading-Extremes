@@ -95,7 +95,7 @@ def render_theory(data: AppData):
         story_section("Directed Forest", "Each event is either an immigrant (exogenous) or child of a parent. Edges show parent -> child links.")
         st.plotly_chart(
             genealogy_tree_plot(T_w, genealogy.parents, genealogy.cascade_probs),
-            use_container_width=True,
+            width="stretch",
         )
         # EI distribution
         import plotly.graph_objects as go
@@ -103,7 +103,7 @@ def render_theory(data: AppData):
         fig_hist.add_trace(go.Histogram(x=genealogy.cascade_probs, nbinsx=30, marker_color="#264653"))
         fig_hist.update_layout(height=280, xaxis_title="1 - mu/lambda", title="EI Distribution")
         from streamlit_test.plots import _apply_style
-        st.plotly_chart(_apply_style(fig_hist), use_container_width=True)
+        st.plotly_chart(_apply_style(fig_hist), width="stretch")
 
     # Tab 2: Cluster Explorer
     with tabs[1]:
@@ -121,7 +121,7 @@ def render_theory(data: AppData):
             if data.d_assets == 3:
                 st.plotly_chart(
                     cluster_sphere_plot(W_w, R_w, cluster_indices, cluster_id, labels=symbols),
-                    use_container_width=True,
+                    width="stretch",
                 )
 
             # Active interval
@@ -144,7 +144,7 @@ def render_theory(data: AppData):
                     "Parent": int(parent),
                     "EI": f"{cp:.3f}",
                 })
-            st.dataframe(rows, use_container_width=True)
+            st.dataframe(rows, width="stretch")
         else:
             st.info("No clusters found.")
 
@@ -164,7 +164,7 @@ def render_theory(data: AppData):
 
         st.plotly_chart(
             subcriticality_bar_plot(diag["row_sums"], margin),
-            use_container_width=True,
+            width="stretch",
         )
 
     # Tab 4: Termination Bounds
@@ -188,7 +188,7 @@ def render_theory(data: AppData):
         empirical_sizes = np.array(cluster_sizes, dtype=np.float64)
         st.plotly_chart(
             termination_bounds_plot(nu, bounds["ns"], bounds["survival_prob"], empirical_sizes),
-            use_container_width=True,
+            width="stretch",
         )
 
         # Cluster size histogram
@@ -197,7 +197,7 @@ def render_theory(data: AppData):
         fig_sz.add_trace(go.Histogram(x=empirical_sizes, nbinsx=20, marker_color="#264653"))
         fig_sz.update_layout(height=280, xaxis_title="Cluster size", title="Empirical Cluster Size Distribution")
         from streamlit_test.plots import _apply_style
-        st.plotly_chart(_apply_style(fig_sz), use_container_width=True)
+        st.plotly_chart(_apply_style(fig_sz), width="stretch")
 
     # Tab 5: Coexistence
     with tabs[4]:
@@ -206,7 +206,7 @@ def render_theory(data: AppData):
         c1, c2 = st.columns(2)
         c1.metric("Max coexistence", str(int(coex.max())) if len(coex) else "0")
         c2.metric("Mean coexistence", f"{float(coex.mean()):.2f}" if len(coex) else "0")
-        st.plotly_chart(coexistence_plot(T_coex, coex), use_container_width=True)
+        st.plotly_chart(coexistence_plot(T_coex, coex), width="stretch")
 
     # Tab 6: Parent Probabilities
     with tabs[5]:
@@ -224,7 +224,7 @@ def render_theory(data: AppData):
             height=280, xaxis_title="Event index",
             yaxis_title="P(immigrant)", title="Immigration Probability",
         )
-        st.plotly_chart(_apply_style(fig_imm), use_container_width=True)
+        st.plotly_chart(_apply_style(fig_imm), width="stretch")
 
         # Full parent prob heatmap (limit to last 100 for readability)
         n_show = min(100, parent_probs.shape[0])
@@ -235,14 +235,14 @@ def render_theory(data: AppData):
             height=400, xaxis_title="Parent (0=immigrant, 1..n=event)",
             yaxis_title="Event i", title="Parent Probability Matrix P(parent=j | i)",
         )
-        st.plotly_chart(_apply_style(fig_pp), use_container_width=True)
+        st.plotly_chart(_apply_style(fig_pp), width="stretch")
 
     # Tab 7: Kernel Analysis
     with tabs[6]:
         story_section("Kernel Analysis", "Hawkes excitation matrix K[i,j] and directional attenuation.")
-        st.plotly_chart(kernel_heatmap(kernel), use_container_width=True)
+        st.plotly_chart(kernel_heatmap(kernel), width="stretch")
         if data.d_assets == 3:
             st.plotly_chart(
                 attenuation_heatmap(W_w, data.model, n_samples=50),
-                use_container_width=True,
+                width="stretch",
             )

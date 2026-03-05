@@ -146,7 +146,7 @@ def _render_threshold_effect(data: AppData, symbols):
                 labels=symbols, color_label=color_lbl,
                 title=f"Extreme events at τ = {tau_slider:.2f} (n = {n_extreme})",
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
     # Show threshold distribution
@@ -154,7 +154,7 @@ def _render_threshold_effect(data: AppData, symbols):
     fig_u.add_trace(go.Histogram(x=u_current, name=f"u<sub>τ</sub> (τ = {data.tau})", opacity=0.65, marker_color="#264653"))
     fig_u.add_trace(go.Histogram(x=u_approx, name=f"u<sub>τ</sub> (τ = {tau_slider})", opacity=0.65, marker_color="#e76f51"))
     fig_u.update_layout(barmode="overlay", height=280, title="Threshold distribution", xaxis_title="u<sub>τ</sub>(W)")
-    st.plotly_chart(_apply_style(fig_u), use_container_width=True)
+    st.plotly_chart(_apply_style(fig_u), width="stretch")
 
 
 def _spherical_to_w(theta: float, phi: float) -> np.ndarray:
@@ -370,7 +370,7 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
             f"{sim['dT'].mean():.2f}",
         ],
     }
-    st.dataframe(metrics, use_container_width=True)
+    st.dataframe(metrics, width="stretch")
 
     # ── QQ-Plots ─────────────────────────────────────────────────────
     fig_qq_r = qq_plot(real["R"], sim["R"], "R")
@@ -378,9 +378,9 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(fig_qq_r, use_container_width=True)
+        st.plotly_chart(fig_qq_r, width="stretch")
     with c2:
-        st.plotly_chart(fig_qq_dt, use_container_width=True)
+        st.plotly_chart(fig_qq_dt, width="stretch")
 
     # ── C2ST: Classifier Two-Sample Test ─────────────────────────────
     story_section(
@@ -398,7 +398,7 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         with c1:
             fig_roc = c2st_roc_plot(c2st["fpr"], c2st["tpr"], c2st["auc_mean"], c2st["auc_std"])
 
-            st.plotly_chart(fig_roc, use_container_width=True)
+            st.plotly_chart(fig_roc, width="stretch")
         with c2:
             st.metric("C2ST AUC", f"{c2st['auc_mean']:.3f} +/- {c2st['auc_std']:.3f}")
             if c2st["auc_mean"] < 0.6:
@@ -450,21 +450,21 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
     fig_box.update_layout(height=300, title="Magnitude distribution")
     _apply_style(fig_box)
 
-    st.plotly_chart(fig_box, use_container_width=True)
+    st.plotly_chart(fig_box, width="stretch")
 
     # Magnitude histograms
     fig_radial = radial_comparison_plot(real["R"], sim["R"])
     fig_dt = _dt_comparison_plot(real["dT"], sim["dT"])
 
-    st.plotly_chart(fig_radial, use_container_width=True)
-    st.plotly_chart(fig_dt, use_container_width=True)
+    st.plotly_chart(fig_radial, width="stretch")
+    st.plotly_chart(fig_dt, width="stretch")
 
     # ── dT Autocorrelation comparison ────────────────────────────────
     acf_real = compute_autocorrelation(real["dT"])
     acf_gen = compute_autocorrelation(sim["dT"])
     fig_acf = acf_comparison_plot(acf_real, acf_gen, "dT")
 
-    st.plotly_chart(fig_acf, use_container_width=True)
+    st.plotly_chart(fig_acf, width="stretch")
 
     # EI distribution overlay
     if real_poc_arr is not None and sim_poc_arr is not None:
@@ -483,7 +483,7 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         )
         _apply_style(fig_ei)
 
-        st.plotly_chart(fig_ei, use_container_width=True)
+        st.plotly_chart(fig_ei, width="stretch")
 
     # ── Intensity decomposition (side-by-side) ───────────────────────
     if real_lam is not None and sim_lam is not None:
@@ -495,10 +495,10 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Real**")
-            st.plotly_chart(fig_int_real, use_container_width=True)
+            st.plotly_chart(fig_int_real, width="stretch")
         with c2:
             st.markdown("**Generated**")
-            st.plotly_chart(fig_int_sim, use_container_width=True)
+            st.plotly_chart(fig_int_sim, width="stretch")
 
     # ── EI time series (side-by-side) ────────────────────────────────
     if real_lam is not None and sim_lam is not None:
@@ -507,9 +507,9 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
 
         c1, c2 = st.columns(2)
         with c1:
-            st.plotly_chart(fig_poc_real, use_container_width=True)
+            st.plotly_chart(fig_poc_real, width="stretch")
         with c2:
-            st.plotly_chart(fig_poc_sim, use_container_width=True)
+            st.plotly_chart(fig_poc_sim, width="stretch")
 
     # ── Genealogy Tree (side-by-side) ────────────────────────────────
     if real_lam is not None and sim_lam is not None:
@@ -523,10 +523,10 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Real**")
-            st.plotly_chart(fig_gen_real, use_container_width=True)
+            st.plotly_chart(fig_gen_real, width="stretch")
         with c2:
             st.markdown("**Generated**")
-            st.plotly_chart(fig_gen_sim, use_container_width=True)
+            st.plotly_chart(fig_gen_sim, width="stretch")
 
     # ── Event Rail (side-by-side) ────────────────────────────────────
     real_dominant = np.argmax(np.abs(real["W"]), axis=1)
@@ -547,9 +547,9 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(fig_rail_real, use_container_width=True)
+        st.plotly_chart(fig_rail_real, width="stretch")
     with c2:
-        st.plotly_chart(fig_rail_sim, use_container_width=True)
+        st.plotly_chart(fig_rail_sim, width="stretch")
 
     # ── Returns tracks (side-by-side) ────────────────────────────────
     fig_ret_real = returns_tracks_plot(real["W"], real["R"], real["T"], symbols)
@@ -557,9 +557,9 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(fig_ret_real, use_container_width=True)
+        st.plotly_chart(fig_ret_real, width="stretch")
     with c2:
-        st.plotly_chart(fig_ret_sim, use_container_width=True)
+        st.plotly_chart(fig_ret_sim, width="stretch")
 
     # ── Side-by-side 3D ──────────────────────────────────────────────
     if data.d_assets == 3:
@@ -587,9 +587,9 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         )
 
         with c1:
-            st.plotly_chart(fig_3d_real, use_container_width=True)
+            st.plotly_chart(fig_3d_real, width="stretch")
         with c2:
-            st.plotly_chart(fig_3d_sim, use_container_width=True)
+            st.plotly_chart(fig_3d_sim, width="stretch")
 
     # ── Loss Diagnostics ─────────────────────────────────────────────
     story_section(
@@ -626,7 +626,7 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         )
         _apply_style(fig_diag)
 
-        st.plotly_chart(fig_diag, use_container_width=True)
+        st.plotly_chart(fig_diag, width="stretch")
 
         # Numeric summary
         diag_table = {
@@ -635,7 +635,7 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
             "Generated": [f"{v:.3f}" for v in sim_vals],
             "Gap": [f"{r - s:.3f}" for r, s in zip(real_vals, sim_vals)],
         }
-        st.dataframe(diag_table, use_container_width=True)
+        st.dataframe(diag_table, width="stretch")
     else:
         st.info("Not enough events to compute loss diagnostics.")
 
@@ -667,14 +667,14 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(fig_tm_real, use_container_width=True)
+        st.plotly_chart(fig_tm_real, width="stretch")
     with c2:
-        st.plotly_chart(fig_tm_sim, use_container_width=True)
+        st.plotly_chart(fig_tm_sim, width="stretch")
 
     # ── Dominant Asset Frequency ─────────────────────────────────────
     freq_real = compute_dominant_freq(real["W"], d)
     freq_gen = compute_dominant_freq(sim["W"], d)
     fig_dom = dominant_asset_bar_plot(freq_real, freq_gen, symbols)
 
-    st.plotly_chart(fig_dom, use_container_width=True)
+    st.plotly_chart(fig_dom, width="stretch")
 
