@@ -1,17 +1,10 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch
-pandas
 numpy
-yfinance
-arch
 scipy
+pandas
 plotly
-streamlit
+streamlit>=1.45
 pyyaml
-kaleido
-fastapi
-uvicorn
-pyarrow
-pydantic
-ruff
-black
-pytest
+arch
+scikit-learn
