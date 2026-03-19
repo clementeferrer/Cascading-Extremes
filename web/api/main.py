@@ -76,6 +76,48 @@ RUNS_DIR.mkdir(parents=True, exist_ok=True)
 PHASE2_META_PATH = ARTIFACTS_DIR / "phase2" / "meta.json"
 PRICES_PATH = ROOT_DIR / "data" / "raw" / "prices_1h_730d.csv"
 
+# ---------------------------------------------------------------------------
+# Cached Phase 2 model singletons (avoid reloading on every request)
+# ---------------------------------------------------------------------------
+_P2_MODEL = None
+_P2_QMODEL = None
+_P2_CFG = None
+_P2_CFG_SYMBOLS: list[str] = []
+_P2_MODEL_SYMBOLS: list[str] = []
+
+
+def _get_phase2():
+    """Return (model, q_model, cfg, cfg_symbols, model_symbols), loading once."""
+    global _P2_MODEL, _P2_QMODEL, _P2_CFG, _P2_CFG_SYMBOLS, _P2_MODEL_SYMBOLS
+    if _P2_MODEL is not None:
+        return _P2_MODEL, _P2_QMODEL, _P2_CFG, _P2_CFG_SYMBOLS, _P2_MODEL_SYMBOLS
+
+    p2_model_path = ARTIFACTS_DIR / "phase2" / "model.pt"
+    p2_q_path = ARTIFACTS_DIR / "phase2" / "quantile_model.pt"
+    if not p2_model_path.exists() or not p2_q_path.exists():
+        raise HTTPException(status_code=500, detail="Phase 2 model artifacts not found.")
+
+    cfg_path = _resolve_config_path("configs/phase2.yaml")
+    cfg = load_config(str(cfg_path))
+    cfg_symbols = [str(s) for s in cfg.get("data", {}).get("symbols", [])]
+    model_symbols = _load_phase2_symbols(default_symbols=cfg_symbols)
+
+    model = load_model_p2(str(p2_model_path))
+    model.to("cpu")
+    model.eval()
+    q_cfg = QCfgP2(**cfg["extremes"]["quantile_model"])
+    q_model = load_qmodel_p2(str(p2_q_path), model.d_assets, q_cfg)
+    q_model.to("cpu")
+    q_model.eval()
+
+    _P2_MODEL = model
+    _P2_QMODEL = q_model
+    _P2_CFG = cfg
+    _P2_CFG_SYMBOLS = cfg_symbols
+    _P2_MODEL_SYMBOLS = model_symbols
+    logger.info("Phase 2 models loaded and cached.")
+    return model, q_model, cfg, cfg_symbols, model_symbols
+
 
 def _resolve_config_path(config_path: str) -> Path:
     cfg_path = Path(config_path)
@@ -334,27 +376,11 @@ def generate_continue(req: GenerateRequest):
             detail="Phase 2 model required for generation.",
         )
 
-    # Load Phase 2 model
-    p2_model_path = ARTIFACTS_DIR / "phase2" / "model.pt"
-    p2_q_path = ARTIFACTS_DIR / "phase2" / "quantile_model.pt"
-    if not p2_model_path.exists() or not p2_q_path.exists():
-        raise HTTPException(status_code=500, detail="Phase 2 model artifacts not found.")
+    model, q_model, cfg, cfg_symbols, model_symbols = _get_phase2()
 
     if req.seed is not None:
         random.seed(req.seed)
         np.random.seed(req.seed)
-
-    cfg_path = _resolve_config_path("configs/phase2.yaml")
-    cfg = load_config(str(cfg_path))
-    cfg_symbols = [str(s) for s in cfg.get("data", {}).get("symbols", [])]
-    model_symbols = _load_phase2_symbols(default_symbols=cfg_symbols)
-    model = load_model_p2(str(p2_model_path))
-    model.to("cpu")
-    model.eval()
-    q_cfg = QCfgP2(**cfg["extremes"]["quantile_model"])
-    q_model = load_qmodel_p2(str(p2_q_path), model.d_assets, q_cfg)
-    q_model.to("cpu")
-    q_model.eval()
 
     # Convert spherical coordinates to direction on S^2
     theta, phi = req.theta, req.phi
@@ -381,8 +407,8 @@ def generate_continue(req: GenerateRequest):
     sim = autoregressive_generate(w0, r0, max_time, model, q_model, temperature=req.temperature)
 
     run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ_gen")
-    cfg_path = _resolve_config_path(req.config)
-    export_run_from_arrays(str(cfg_path), run_id, "generative", sim, output_dir=str(RUNS_DIR))
+    export_cfg_path = _resolve_config_path(req.config)
+    export_run_from_arrays(str(export_cfg_path), run_id, "generative", sim, output_dir=str(RUNS_DIR))
     return {"run_id": run_id}
 
 
@@ -400,13 +426,13 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
         raise HTTPException(status_code=500, detail="Phase 2 model required for generation.")
 
     cdfs_path = ARTIFACTS_DIR / "phase2" / "cdfs.npz"
-    p2_model_path = ARTIFACTS_DIR / "phase2" / "model.pt"
-    p2_q_path = ARTIFACTS_DIR / "phase2" / "quantile_model.pt"
-    if not cdfs_path.exists() or not p2_model_path.exists() or not p2_q_path.exists():
-        raise HTTPException(status_code=500, detail="Phase 2 artifacts not found.")
+    if not cdfs_path.exists():
+        raise HTTPException(status_code=500, detail="Phase 2 CDF artifacts not found.")
 
     try:
         from cascades.utils import EmpiricalCDF
+
+        model, q_model, cfg, cfg_symbols, model_symbols = _get_phase2()
 
         if req.seed is not None:
             random.seed(req.seed)
@@ -441,19 +467,7 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
                     "message": "Returns too close to zero to form a direction."}
         W = X / R
 
-        # Load quantile model and check threshold
-        cfg_path = _resolve_config_path("configs/phase2.yaml")
-        cfg = load_config(str(cfg_path))
-        cfg_symbols = [str(s) for s in cfg.get("data", {}).get("symbols", [])]
-        model_symbols = _load_phase2_symbols(default_symbols=asset_order)
-        model = load_model_p2(str(p2_model_path))
-        model.to("cpu")
-        model.eval()
-        q_cfg = QCfgP2(**cfg["extremes"]["quantile_model"])
-        q_model = load_qmodel_p2(str(p2_q_path), model.d_assets, q_cfg)
-        q_model.to("cpu")
-        q_model.eval()
-
+        # Check threshold
         u_tau = q_model(torch.tensor(W[None, :], dtype=torch.float32)).item()
 
         if R <= u_tau:
@@ -482,7 +496,8 @@ def generate_from_returns(req: GenerateFromReturnsRequest):
         sim_export = dict(sim)
         sim_export["W"] = _reorder_w_columns(np.asarray(sim["W"], dtype=np.float32), model_symbols, cfg_symbols)
         run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ_gen")
-        export_run_from_arrays(str(cfg_path), run_id, "generative", sim_export, output_dir=str(RUNS_DIR))
+        export_cfg_path = _resolve_config_path("configs/phase2.yaml")
+        export_run_from_arrays(str(export_cfg_path), run_id, "generative", sim_export, output_dir=str(RUNS_DIR))
         return {"extreme": True, "run_id": run_id}
 
     except HTTPException:

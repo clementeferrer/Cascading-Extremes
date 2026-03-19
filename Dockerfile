@@ -15,7 +15,8 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
 COPY web/api/requirements.txt /app/web/api/requirements.txt
-RUN pip install --no-cache-dir -r /app/web/api/requirements.txt
+RUN pip install --no-cache-dir -r /app/web/api/requirements.txt && \
+    rm -rf /root/.cache/pip /tmp/*
 
 COPY web/api /app/web/api
 COPY cascades /app/cascades

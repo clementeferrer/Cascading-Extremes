@@ -197,6 +197,46 @@ def inject_styles():
             background: linear-gradient(90deg, rgba(15,23,42,0.2), rgba(15,23,42,0.0));
             margin: 12px 0;
         }
+        /* ── Print ── */
+        @media print {
+            /* KEY FIX: override flexbox → block so break-inside works */
+            div[data-testid="stVerticalBlock"],
+            div[data-testid="stHorizontalBlock"],
+            div[data-testid="stVerticalBlockBorderWrapper"],
+            .stMainBlockContainer > div,
+            section[data-testid="stMain"] > div,
+            div[data-testid="stColumn"] > div {
+                display: block !important;
+            }
+
+            /* Now break-inside is respected */
+            div[data-testid="stPlotlyChart"],
+            div[data-testid="stMetric"],
+            .section-block, .hero, .panel {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+            }
+
+            /* Hide interactive-only elements */
+            [data-testid="stSidebar"],
+            .stButton,
+            div[data-testid="stSlider"],
+            header[data-testid="stHeader"],
+            footer {
+                display: none !important;
+            }
+
+            /* White background */
+            .stApp {
+                background: white !important;
+            }
+
+            /* Avoid orphan headings */
+            h1, h2, h3, h4 {
+                break-after: avoid !important;
+                page-break-after: avoid !important;
+            }
+        }
         </style>
         """,
         unsafe_allow_html=True,

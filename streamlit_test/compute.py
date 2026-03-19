@@ -510,6 +510,42 @@ def transition_matrix_distance(P_real: np.ndarray, P_gen: np.ndarray) -> float:
     return float(np.linalg.norm(P_real - P_gen))
 
 
+def compute_exceedance_matrix(
+    W: np.ndarray, R: np.ndarray, d: int, quantile: float = 0.95, lagged: bool = False,
+) -> np.ndarray:
+    """Conditional exceedance probability matrix.
+
+    Parameters
+    ----------
+    W : (N, d) angular components
+    R : (N,) radial magnitudes
+    d : number of assets
+    quantile : marginal quantile level for per-component threshold
+    lagged : if False, compute contemporaneous P(X_t^j > u_j | X_t^i > u_i);
+             if True, compute lagged P(X_t^j > u_j | X_{t-1}^i > u_i).
+
+    Returns (d, d) matrix where entry [i, j] is the conditional probability.
+    """
+    X = R[:, None] * W  # (N, d)
+    absX = np.abs(X)
+    thresholds = np.quantile(absX, quantile, axis=0)  # (d,)
+    exceed = absX > thresholds[None, :]  # (N, d) bool
+
+    mat = np.zeros((d, d), dtype=np.float64)
+    for i in range(d):
+        for j in range(d):
+            if lagged:
+                cond = exceed[:-1, i]
+                target = exceed[1:, j]
+            else:
+                cond = exceed[:, i]
+                target = exceed[:, j]
+            n_cond = cond.sum()
+            if n_cond > 0:
+                mat[i, j] = float((cond & target).sum()) / float(n_cond)
+    return mat
+
+
 # ── C2ST: Classifier Two-Sample Test ─────────────────────────────────
 
 

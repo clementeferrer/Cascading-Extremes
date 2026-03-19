@@ -16,6 +16,8 @@ from streamlit_test.compute import (
     cascade_termination_bounds,
 )
 from streamlit_test.plots import (
+    downloadable_chart,
+    _apply_style,
     genealogy_tree_plot,
     cluster_sphere_plot,
     subcriticality_bar_plot,
@@ -93,17 +95,16 @@ def render_theory(data: AppData):
     # Tab 1: Genealogy Tree
     with tabs[0]:
         story_section("Directed Forest", "Each event is either an immigrant (exogenous) or child of a parent. Edges show parent -> child links.")
-        st.plotly_chart(
+        downloadable_chart(
             genealogy_tree_plot(T_w, genealogy.parents, genealogy.cascade_probs),
-            width="stretch",
+            key="t_genealogy_tree",
         )
         # EI distribution
         import plotly.graph_objects as go
         fig_hist = go.Figure()
         fig_hist.add_trace(go.Histogram(x=genealogy.cascade_probs, nbinsx=30, marker_color="#264653"))
         fig_hist.update_layout(height=280, xaxis_title="1 - mu/lambda", title="EI Distribution")
-        from streamlit_test.plots import _apply_style
-        st.plotly_chart(_apply_style(fig_hist), width="stretch")
+        downloadable_chart(_apply_style(fig_hist), key="t_ei_dist")
 
     # Tab 2: Cluster Explorer
     with tabs[1]:
@@ -119,9 +120,9 @@ def render_theory(data: AppData):
             cluster_indices = genealogy.clusters[cluster_id]
 
             if data.d_assets == 3:
-                st.plotly_chart(
+                downloadable_chart(
                     cluster_sphere_plot(W_w, R_w, cluster_indices, cluster_id, labels=symbols),
-                    width="stretch",
+                    key=f"t_cluster_{cluster_id}",
                 )
 
             # Active interval
@@ -144,7 +145,7 @@ def render_theory(data: AppData):
                     "Parent": int(parent),
                     "EI": f"{cp:.3f}",
                 })
-            st.dataframe(rows, width="stretch")
+            st.dataframe(rows, use_container_width=True)
         else:
             st.info("No clusters found.")
 
@@ -162,9 +163,9 @@ def render_theory(data: AppData):
         penalty = max(0, diag["max_row_sum"] - margin) ** 2
         st.write(f"**Penalty value:** {penalty:.6f}")
 
-        st.plotly_chart(
+        downloadable_chart(
             subcriticality_bar_plot(diag["row_sums"], margin),
-            width="stretch",
+            key="t_subcriticality",
         )
 
     # Tab 4: Termination Bounds
@@ -186,9 +187,9 @@ def render_theory(data: AppData):
 
         # Empirical cluster sizes for comparison
         empirical_sizes = np.array(cluster_sizes, dtype=np.float64)
-        st.plotly_chart(
+        downloadable_chart(
             termination_bounds_plot(nu, bounds["ns"], bounds["survival_prob"], empirical_sizes),
-            width="stretch",
+            key="t_termination_bounds",
         )
 
         # Cluster size histogram
@@ -196,8 +197,7 @@ def render_theory(data: AppData):
         fig_sz = go.Figure()
         fig_sz.add_trace(go.Histogram(x=empirical_sizes, nbinsx=20, marker_color="#264653"))
         fig_sz.update_layout(height=280, xaxis_title="Cluster size", title="Empirical Cluster Size Distribution")
-        from streamlit_test.plots import _apply_style
-        st.plotly_chart(_apply_style(fig_sz), width="stretch")
+        downloadable_chart(_apply_style(fig_sz), key="t_cluster_sizes")
 
     # Tab 5: Coexistence
     with tabs[4]:
@@ -206,7 +206,7 @@ def render_theory(data: AppData):
         c1, c2 = st.columns(2)
         c1.metric("Max coexistence", str(int(coex.max())) if len(coex) else "0")
         c2.metric("Mean coexistence", f"{float(coex.mean()):.2f}" if len(coex) else "0")
-        st.plotly_chart(coexistence_plot(T_coex, coex), width="stretch")
+        downloadable_chart(coexistence_plot(T_coex, coex), key="t_coexistence")
 
     # Tab 6: Parent Probabilities
     with tabs[5]:
@@ -215,7 +215,6 @@ def render_theory(data: AppData):
 
         # Immigration probability bar chart
         import plotly.graph_objects as go
-        from streamlit_test.plots import _apply_style
         imm_prob = parent_probs[:, 0]
         fig_imm = go.Figure()
         fig_imm.add_trace(go.Bar(y=imm_prob, marker_color="#264653"))
@@ -224,7 +223,7 @@ def render_theory(data: AppData):
             height=280, xaxis_title="Event index",
             yaxis_title="P(immigrant)", title="Immigration Probability",
         )
-        st.plotly_chart(_apply_style(fig_imm), width="stretch")
+        downloadable_chart(_apply_style(fig_imm), key="t_immigration_prob")
 
         # Full parent prob heatmap (limit to last 100 for readability)
         n_show = min(100, parent_probs.shape[0])
@@ -235,14 +234,129 @@ def render_theory(data: AppData):
             height=400, xaxis_title="Parent (0=immigrant, 1..n=event)",
             yaxis_title="Event i", title="Parent Probability Matrix P(parent=j | i)",
         )
-        st.plotly_chart(_apply_style(fig_pp), width="stretch")
+        downloadable_chart(_apply_style(fig_pp), key="t_parent_prob_matrix")
 
     # Tab 7: Kernel Analysis
     with tabs[6]:
         story_section("Kernel Analysis", "Hawkes excitation matrix K[i,j] and directional attenuation.")
-        st.plotly_chart(kernel_heatmap(kernel), width="stretch")
+        downloadable_chart(kernel_heatmap(kernel), key="t_kernel_heatmap")
         if data.d_assets == 3:
-            st.plotly_chart(
+            downloadable_chart(
                 attenuation_heatmap(W_w, data.model, n_samples=50),
-                width="stretch",
+                key="t_attenuation_heatmap",
             )
+
+    # ── Additional Theory Sections ────────────────────────────────────
+    st.markdown("---")
+
+    with st.expander("Training & Optimization"):
+        st.markdown("""
+| Parameter | Value |
+|-----------|-------|
+| Optimizer | AdamW |
+| Learning rate | 1 × 10⁻⁴ |
+| Weight decay | 5 × 10⁻⁴ |
+| Batch size | 16 |
+| Sequence length | 128 events |
+| Epochs | 150 (best val checkpoint saved) |
+| Gradient clipping | max norm = 1.0 |
+| LR scheduler | None |
+| Early stopping | No — full 150 epochs, best val loss checkpoint |
+| Train / Val / Test | 70% / 15% / 15% |
+| Device | CPU |
+| Seed | 42 |
+""")
+        st.markdown(
+            "The model is trained with **AdamW** and gradient clipping (max norm 1.0). "
+            "Batches containing NaN or Inf values are skipped automatically. "
+            "No learning rate scheduler is used in the default configuration — the learning rate "
+            "remains constant at 1 × 10⁻⁴ throughout training. The best validation loss checkpoint "
+            "is saved and used for generation."
+        )
+
+    with st.expander("Loss Function"):
+        st.markdown("**Joint negative log-likelihood with subcriticality penalty:**")
+        st.latex(
+            r"\mathcal{L} = -\frac{1}{N}\sum_{i} \bigl[ w_{\text{dir}} \log p(W_i \mid h_i)"
+            r" + w_{\text{mag}} \log p(R_i \mid h_i)"
+            r" + w_{\text{time}} \log p(\Delta T_i \mid h_i) \bigr]"
+            r" + \lambda_s \cdot \text{penalty}"
+        )
+
+        st.markdown("**Direction** (mixture of von Mises-Fisher, $K=6$):")
+        st.latex(
+            r"\log p(W \mid h) = \log \sum_{k=1}^{K} \pi_k \cdot C_d(\kappa_k)"
+            r" \exp\!\bigl(\kappa_k \, \mu_k^\top W\bigr)"
+            r"\qquad\text{where } C_3(\kappa) = \frac{\kappa}{4\pi \sinh \kappa}"
+        )
+
+        st.markdown("**Magnitude** (truncated Gamma):")
+        st.latex(
+            r"\log p(R \mid h) = \log f_{\Gamma}(R;\, a, \beta)"
+            r" - \log \mathbb{P}(R > u_\tau(W))"
+        )
+
+        st.markdown("**Time** (Hawkes process):")
+        st.latex(r"\log p(\Delta T \mid h) = \log \lambda_i - \lambda_i \cdot \Delta T_i")
+        st.latex(
+            r"\lambda_i = \mu(h_i) + \sum_{j<i} A_{ij}"
+            r" \exp\!\bigl(-\Delta t / \tau_{ij}\bigr)"
+            r" \cdot \kappa(W_i, W_j) \cdot \varphi(R_j)"
+        )
+
+        st.markdown("**Subcriticality penalty:**")
+        st.latex(
+            r"\text{penalty} = \max\!\bigl(0,\;"
+            r" \max_i \textstyle\sum_j K_{ij} - 0.95\bigr)^2"
+        )
+
+        st.markdown(
+            r"Default weights: $w_{\text{dir}} = w_{\text{mag}} = w_{\text{time}} = 1.0$, "
+            r"$\lambda_s = 0.1$."
+        )
+
+    with st.expander("Generative Algorithm"):
+        st.markdown(
+            "The sampling scheme exactly inverts the training loss: "
+            r"$\Delta T \sim \text{Exp}(\lambda)$ is the inverse of $\log \lambda - \lambda \cdot \Delta T$, "
+            "ensuring consistency between training and generation."
+        )
+        st.code(r"""Algorithm 1: Autoregressive Cascade Generation
+────────────────────────────────────────────────
+Input:  w₀ ∈ S^{d−1}, r₀ > 0, horizon H, temperature T
+        Optional prompt: {W_{1:n}, R_{1:n}, T_{1:n}, ΔT_{1:n}}
+
+ 1  if prompt given then
+ 2      (W, R, T, ΔT) ← prompt ∪ {(w₀, r₀)}
+ 3      T_end ← T_last + H
+ 4  else
+ 5      W ← [w₀],  R ← [r₀],  T ← [0],  ΔT ← [1]
+ 6      T_end ← H
+
+ 7  while T_last < T_end do
+
+ 8      h ← Transformer(tokens_{1:i})          ▷ encode full history
+
+        ── Sample direction ──
+ 9      (π, {μ_k}, {κ_k})_{k=1}^K ← heads(h)
+10      π ← softmax(log π / T)                 ▷ temperature scaling
+11      κ_k ← κ_k / T
+12      k* ~ Categorical(π)
+13      W_{i+1} ~ vMF(μ_{k*}, κ_{k*})          ▷ Wood (1994)
+
+        ── Sample magnitude ──
+14      β ← softplus(gauge_net(h, log R_i, W_{i+1}))
+15      a ← softplus(a_param) + a_min
+16      u ← q_model(W_{i+1})                   ▷ direction-dependent threshold
+17      R_{i+1} ~ Gamma(a, β) | R > u           ▷ inverse CDF truncation
+
+        ── Sample timing ──
+18      μ_i ← softplus(mu_net(h))
+19      ψ_i ← Σ_{j<i} A_{ij} exp(−ΔT/τ_{ij}) · κ(W_i,W_j) · φ(R_j)
+20      λ_i ← μ_i + ψ_i
+21      ΔT_{i+1} ← −log(u) / λ_i,  u ~ U(0,1) ▷ Exp(λ_i) sampling
+22      T_{i+1} ← T_i + ΔT_{i+1}
+
+23      append (W_{i+1}, R_{i+1}, T_{i+1}, ΔT_{i+1})
+
+24  return {W, R, T, ΔT}""", language=None)

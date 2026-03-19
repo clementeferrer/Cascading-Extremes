@@ -9,6 +9,7 @@ from streamlit_test.data_loader import AppData
 from streamlit_test.styles import hero_section, story_section, panel
 from streamlit_test.compute import compute_hawkes_decomposition
 from streamlit_test.plots import (
+    downloadable_chart,
     scene_3d_sphere,
     intensity_decomposition_plot,
     poc_plot,
@@ -82,7 +83,7 @@ def render_viewer(data: AppData):
         bulk_positions=data.bulk_positions,
         color_label=color_label,
     )
-    st.plotly_chart(fig_3d, width="stretch")
+    downloadable_chart(fig_3d, key="v_3d_scene")
 
     # Tabs
     tab_int, tab_poc, tab_rail, tab_ret = st.tabs(
@@ -92,9 +93,9 @@ def render_viewer(data: AppData):
     with tab_int:
         if lam is not None:
             start = max(0, len(T) - len(lam))
-            st.plotly_chart(
+            downloadable_chart(
                 intensity_decomposition_plot(T[start:], lam, psi),
-                width="stretch",
+                key="v_intensity",
             )
         else:
             st.info("Not enough events for intensity decomposition.")
@@ -102,7 +103,7 @@ def render_viewer(data: AppData):
     with tab_poc:
         if lam is not None:
             start = max(0, len(T) - len(lam))
-            st.plotly_chart(poc_plot(T[start:], lam, psi), width="stretch")
+            downloadable_chart(poc_plot(T[start:], lam, psi), key="v_poc")
 
     with tab_rail:
         dominant = np.argmax(np.abs(W), axis=1)
@@ -113,7 +114,7 @@ def render_viewer(data: AppData):
             poc_full = np.zeros(len(T))
             poc_full[start:] = poc_arr
             poc_vals = poc_full
-        st.plotly_chart(event_rail_plot(T, asset_labels, poc_vals), width="stretch")
+        downloadable_chart(event_rail_plot(T, asset_labels, poc_vals), key="v_rail")
 
     with tab_ret:
-        st.plotly_chart(returns_tracks_plot(W, R, T, symbols), width="stretch")
+        downloadable_chart(returns_tracks_plot(W, R, T, symbols), key="v_returns")

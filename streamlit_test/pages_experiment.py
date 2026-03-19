@@ -21,10 +21,12 @@ from streamlit_test.compute import (
     compute_dominant_freq,
     compute_transition_matrix,
     transition_matrix_distance,
+    compute_exceedance_matrix,
     compute_c2st,
 )
 from streamlit_test.plots import (
     _apply_style,
+    downloadable_chart,
     scene_3d_sphere,
     intensity_decomposition_plot,
     poc_plot,
@@ -140,13 +142,13 @@ def _render_threshold_effect(data: AppData, symbols):
             color_vals, color_lbl = ei_ext, "EI"
         else:
             color_vals, color_lbl = R_ext, "R"
-        st.plotly_chart(
+        downloadable_chart(
             scene_3d_sphere(
                 W_ext, R_ext, color_vals,
                 labels=symbols, color_label=color_lbl,
                 title=f"Extreme events at τ = {tau_slider:.2f} (n = {n_extreme})",
             ),
-            width="stretch",
+            key="e_3d_extremes",
         )
 
     # Show threshold distribution
@@ -154,7 +156,7 @@ def _render_threshold_effect(data: AppData, symbols):
     fig_u.add_trace(go.Histogram(x=u_current, name=f"u<sub>τ</sub> (τ = {data.tau})", opacity=0.65, marker_color="#264653"))
     fig_u.add_trace(go.Histogram(x=u_approx, name=f"u<sub>τ</sub> (τ = {tau_slider})", opacity=0.65, marker_color="#e76f51"))
     fig_u.update_layout(barmode="overlay", height=280, title="Threshold distribution", xaxis_title="u<sub>τ</sub>(W)")
-    st.plotly_chart(_apply_style(fig_u), width="stretch")
+    downloadable_chart(_apply_style(fig_u), key="e_threshold_dist")
 
 
 def _spherical_to_w(theta: float, phi: float) -> np.ndarray:
@@ -182,11 +184,12 @@ def _spherical_direction_input(symbols, key_prefix: str, data: AppData | None = 
     presets = {}
 
     # First real extreme preset (when data is available)
+    first_R = None
     if data is not None and len(data.real_events.get("W", [])) > 0:
         W_first = data.real_events["W"][0]
-        R_first = float(data.real_events["R"][0])
+        first_R = float(data.real_events["R"][0])
         theta_first, phi_first = _w_to_spherical(W_first)
-        presets[f"First real extreme (R={R_first:.2f})"] = (theta_first, phi_first)
+        presets[f"First real extreme (R={first_R:.2f})"] = (theta_first, phi_first)
 
     presets.update({
         f"{symbols[0]} (+)": (0.0, np.pi / 2),
@@ -197,6 +200,17 @@ def _spherical_direction_input(symbols, key_prefix: str, data: AppData | None = 
         f"{symbols[2]} (-)": (0.0, np.pi),
         "Custom": None,
     })
+
+    # Detect data source changes (directional ↔ global) and reset preset state
+    source_key = f"{key_prefix}_data_source"
+    source_fingerprint = f"{data.threshold_mode}_{len(data.real_events['T'])}" if data else ""
+    if st.session_state.get(source_key) != source_fingerprint:
+        st.session_state[source_key] = source_fingerprint
+        for k in [f"{key_prefix}_prev_preset", f"{key_prefix}_preset",
+                   f"{key_prefix}_theta", f"{key_prefix}_phi",
+                   f"{key_prefix}_shock_mag"]:
+            st.session_state.pop(k, None)
+
     preset = st.selectbox("Direction preset", list(presets.keys()), key=f"{key_prefix}_preset")
 
     # When preset changes, push its angles (and magnitude for first-event) into session state
@@ -207,15 +221,18 @@ def _spherical_direction_input(symbols, key_prefix: str, data: AppData | None = 
             st.session_state[f"{key_prefix}_theta"] = presets[preset][0]
             st.session_state[f"{key_prefix}_phi"] = presets[preset][1]
         # Auto-fill magnitude when selecting the first real extreme
-        if "First real extreme" in preset and data is not None:
-            R_first = float(data.real_events["R"][0])
-            st.session_state[f"{key_prefix}_shock_mag"] = R_first
+        if "First real extreme" in preset and first_R is not None:
+            st.session_state[f"{key_prefix}_shock_mag"] = first_R
 
-    # Set defaults only if not already in session state
+    # Set defaults from the first real extreme (not hardcoded)
     if f"{key_prefix}_theta" not in st.session_state:
-        st.session_state[f"{key_prefix}_theta"] = 0.0
+        default_theta = theta_first if first_R is not None else 0.0
+        st.session_state[f"{key_prefix}_theta"] = default_theta
     if f"{key_prefix}_phi" not in st.session_state:
-        st.session_state[f"{key_prefix}_phi"] = np.pi / 2
+        default_phi = phi_first if first_R is not None else np.pi / 2
+        st.session_state[f"{key_prefix}_phi"] = default_phi
+    if f"{key_prefix}_shock_mag" not in st.session_state and first_R is not None:
+        st.session_state[f"{key_prefix}_shock_mag"] = first_R
 
     c1, c2 = st.columns(2)
     with c1:
@@ -239,7 +256,7 @@ def _spherical_direction_input(symbols, key_prefix: str, data: AppData | None = 
 def _render_statistics_comparison(data: AppData, symbols):
     story_section(
         "Statistics Comparison",
-        "Compare real vs simulated event statistics side by side.",
+        "Real vs. generated event distributions.",
     )
 
     real = data.real_events
@@ -267,8 +284,9 @@ def _render_statistics_comparison(data: AppData, symbols):
 
         c1, c2, c3 = st.columns(3)
         with c1:
+            default_R = float(data.real_events["R"][0]) if len(data.real_events.get("R", [])) > 0 else 3.0
             shock_mag = st.number_input(
-                "Magnitude R", value=3.0, min_value=0.1, step=0.5, key="stat_shock_mag",
+                "Magnitude R", value=default_R, min_value=0.1, step=0.5, key="stat_shock_mag",
             )
         with c2:
             horizon = st.number_input(
@@ -352,7 +370,7 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
 
     # Basic metrics table
     metrics = {
-        "Metric": ["Events", "Mean R", "Std R", "Min R", "Max R", "Mean dT (h)"],
+        "Metric": ["n", "E[R]", "σ(R)", "min R", "max R", "E[ΔT] (h)"],
         "Real": [
             len(real["R"]),
             f"{real['R'].mean():.3f}",
@@ -370,45 +388,26 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
             f"{sim['dT'].mean():.2f}",
         ],
     }
-    st.dataframe(metrics, width="stretch")
+    st.dataframe(metrics, use_container_width=True)
 
     # ── QQ-Plots ─────────────────────────────────────────────────────
     fig_qq_r = qq_plot(real["R"], sim["R"], "R")
-    fig_qq_dt = qq_plot(real["dT"], sim["dT"], "dT")
+    fig_qq_dt = qq_plot(real["dT"], sim["dT"], "ΔT")
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(fig_qq_r, width="stretch")
+        downloadable_chart(fig_qq_r, key="e_qq_r")
     with c2:
-        st.plotly_chart(fig_qq_dt, width="stretch")
+        downloadable_chart(fig_qq_dt, key="e_qq_dt")
 
-    # ── C2ST: Classifier Two-Sample Test ─────────────────────────────
-    story_section(
-        "C2ST: Classifier Two-Sample Test",
-        "Can a logistic regression classifier distinguish real from generated events? "
-        "AUC ~ 0.5 = indistinguishable (good), AUC > 0.7 = distinguishable (bad).",
-    )
-    # Build feature vectors: [R, log(dT), W...] per event
+    # ── C2ST ──────────────────────────────────────────────────────────
     d = len(symbols)
     real_feat = np.column_stack([real["R"], np.log(real["dT"] + 1e-8), real["W"]])
     gen_feat = np.column_stack([sim["R"], np.log(sim["dT"] + 1e-8), sim["W"]])
     if len(real_feat) >= 10 and len(gen_feat) >= 10:
         c2st = compute_c2st(real_feat, gen_feat)
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            fig_roc = c2st_roc_plot(c2st["fpr"], c2st["tpr"], c2st["auc_mean"], c2st["auc_std"])
-
-            st.plotly_chart(fig_roc, width="stretch")
-        with c2:
-            st.metric("C2ST AUC", f"{c2st['auc_mean']:.3f} +/- {c2st['auc_std']:.3f}")
-            if c2st["auc_mean"] < 0.6:
-                st.success("Excellent: distributions are nearly indistinguishable.")
-            elif c2st["auc_mean"] < 0.7:
-                st.info("Good: mild separability.")
-            else:
-                st.warning("Separable: the classifier can distinguish real from generated.")
-    else:
-        st.info("Not enough events for C2ST (need >= 10 per class).")
+        fig_roc = c2st_roc_plot(c2st["fpr"], c2st["tpr"], c2st["auc_mean"], c2st["auc_std"])
+        downloadable_chart(fig_roc, key="e_c2st_roc")
 
     # Compute Hawkes decomposition for both
     real_window = min(1024, len(real["T"]))
@@ -430,41 +429,30 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         sim_mu = np.maximum(sim_lam - sim_psi, 0.0)
         sim_poc_arr = 1.0 - sim_mu / np.maximum(sim_lam, 1e-8)
 
-        c1, c2 = st.columns(2)
-        c1.metric("Real Mean EI", f"{float(np.mean(real_poc_arr)):.3f}")
-        c2.metric("Generated Mean EI", f"{float(np.mean(sim_poc_arr)):.3f}")
-
-        # Branching ratio comparison
-        if real_kernel is not None and sim_kernel is not None:
-            nu_real = float(real_kernel.sum(axis=-1).mean())
-            nu_gen = float(sim_kernel.sum(axis=-1).mean())
-            c1, c2 = st.columns(2)
-            c1.metric("Real branching ratio nu", f"{nu_real:.4f}")
-            c2.metric("Generated branching ratio nu", f"{nu_gen:.4f}")
 
     # ── Distribution comparisons ─────────────────────────────────────
     # Magnitude boxplots
     fig_box = go.Figure()
     fig_box.add_trace(go.Box(y=real["R"], name="Real", marker_color="#264653"))
     fig_box.add_trace(go.Box(y=sim["R"], name="Generated", marker_color="#e76f51"))
-    fig_box.update_layout(height=300, title="Magnitude distribution")
+    fig_box.update_layout(height=300, title="Radial magnitude boxplots")
     _apply_style(fig_box)
 
-    st.plotly_chart(fig_box, width="stretch")
+    downloadable_chart(fig_box, key="e_magnitude_box")
 
     # Magnitude histograms
     fig_radial = radial_comparison_plot(real["R"], sim["R"])
     fig_dt = _dt_comparison_plot(real["dT"], sim["dT"])
 
-    st.plotly_chart(fig_radial, width="stretch")
-    st.plotly_chart(fig_dt, width="stretch")
+    downloadable_chart(fig_radial, key="e_radial_hist")
+    downloadable_chart(fig_dt, key="e_dt_hist")
 
     # ── dT Autocorrelation comparison ────────────────────────────────
     acf_real = compute_autocorrelation(real["dT"])
     acf_gen = compute_autocorrelation(sim["dT"])
     fig_acf = acf_comparison_plot(acf_real, acf_gen, "dT")
 
-    st.plotly_chart(fig_acf, width="stretch")
+    downloadable_chart(fig_acf, key="e_acf")
 
     # EI distribution overlay
     if real_poc_arr is not None and sim_poc_arr is not None:
@@ -483,7 +471,7 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         )
         _apply_style(fig_ei)
 
-        st.plotly_chart(fig_ei, width="stretch")
+        downloadable_chart(fig_ei, key="e_ei_dist")
 
     # ── Intensity decomposition (side-by-side) ───────────────────────
     if real_lam is not None and sim_lam is not None:
@@ -495,10 +483,10 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Real**")
-            st.plotly_chart(fig_int_real, width="stretch")
+            downloadable_chart(fig_int_real, key="e_intensity_real")
         with c2:
             st.markdown("**Generated**")
-            st.plotly_chart(fig_int_sim, width="stretch")
+            downloadable_chart(fig_int_sim, key="e_intensity_sim")
 
     # ── EI time series (side-by-side) ────────────────────────────────
     if real_lam is not None and sim_lam is not None:
@@ -507,9 +495,9 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
 
         c1, c2 = st.columns(2)
         with c1:
-            st.plotly_chart(fig_poc_real, width="stretch")
+            downloadable_chart(fig_poc_real, key="e_ei_real")
         with c2:
-            st.plotly_chart(fig_poc_sim, width="stretch")
+            downloadable_chart(fig_poc_sim, key="e_ei_sim")
 
     # ── Genealogy Tree (side-by-side) ────────────────────────────────
     if real_lam is not None and sim_lam is not None:
@@ -523,10 +511,10 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Real**")
-            st.plotly_chart(fig_gen_real, width="stretch")
+            downloadable_chart(fig_gen_real, key="e_genealogy_real")
         with c2:
             st.markdown("**Generated**")
-            st.plotly_chart(fig_gen_sim, width="stretch")
+            downloadable_chart(fig_gen_sim, key="e_genealogy_sim")
 
     # ── Event Rail (side-by-side) ────────────────────────────────────
     real_dominant = np.argmax(np.abs(real["W"]), axis=1)
@@ -547,9 +535,9 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(fig_rail_real, width="stretch")
+        downloadable_chart(fig_rail_real, key="e_rail_real")
     with c2:
-        st.plotly_chart(fig_rail_sim, width="stretch")
+        downloadable_chart(fig_rail_sim, key="e_rail_sim")
 
     # ── Returns tracks (side-by-side) ────────────────────────────────
     fig_ret_real = returns_tracks_plot(real["W"], real["R"], real["T"], symbols)
@@ -557,9 +545,9 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(fig_ret_real, width="stretch")
+        downloadable_chart(fig_ret_real, key="e_returns_real")
     with c2:
-        st.plotly_chart(fig_ret_sim, width="stretch")
+        downloadable_chart(fig_ret_sim, key="e_returns_sim")
 
     # ── Side-by-side 3D ──────────────────────────────────────────────
     if data.d_assets == 3:
@@ -587,15 +575,11 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         )
 
         with c1:
-            st.plotly_chart(fig_3d_real, width="stretch")
+            downloadable_chart(fig_3d_real, key="e_3d_real")
         with c2:
-            st.plotly_chart(fig_3d_sim, width="stretch")
+            downloadable_chart(fig_3d_sim, key="e_3d_sim")
 
     # ── Loss Diagnostics ─────────────────────────────────────────────
-    story_section(
-        "Loss Diagnostics",
-        "Per-component log-likelihoods (direction, magnitude, time) on real vs generated events.",
-    )
     real_loss = compute_loss_components(
         data, real["T"], real["R"], real["W"], real["dT"],
         u=real.get("u"), tokens=real.get("tokens"),
@@ -605,7 +589,7 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         u=sim.get("u"), tokens=sim.get("tokens"),
     )
     if real_loss is not None and sim_loss is not None:
-        comp_names = ["Direction (W)", "Magnitude (R)", "Time (dT)"]
+        comp_names = ["W", "R", "ΔT"]
         comp_keys = ["log_p_w", "log_p_r", "log_p_t"]
         real_vals = [real_loss[k] for k in comp_keys]
         sim_vals = [sim_loss[k] for k in comp_keys]
@@ -621,12 +605,12 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
         ))
         fig_diag.update_layout(
             barmode="group", height=350,
-            title="Per-component mean log-likelihood",
-            yaxis_title="Mean log p",
+            title="Mean log-likelihood by component",
+            yaxis_title="E[log p]",
         )
         _apply_style(fig_diag)
 
-        st.plotly_chart(fig_diag, width="stretch")
+        downloadable_chart(fig_diag, key="e_loss_diag")
 
         # Numeric summary
         diag_table = {
@@ -635,16 +619,22 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
             "Generated": [f"{v:.3f}" for v in sim_vals],
             "Gap": [f"{r - s:.3f}" for r, s in zip(real_vals, sim_vals)],
         }
-        st.dataframe(diag_table, width="stretch")
+        st.dataframe(diag_table, use_container_width=True)
     else:
         st.info("Not enough events to compute loss diagnostics.")
 
     # ── Transition Matrix (side-by-side) ─────────────────────────────
+    st.markdown(
+        r"**Transition matrix** $P_{ij} = \mathbb{P}(\text{dominant asset at event } t{+}1 = j "
+        r"\mid \text{dominant asset at event } t = i)$, computed over consecutive extreme events. "
+        r"The dominant asset is $\arg\max_j |W_j|$. All events are exceedances "
+        r"($R > u_\tau(W)$ at $\tau = 0.95$)."
+    )
     d = len(symbols)
     P_real = compute_transition_matrix(real["W"], d)
     P_gen = compute_transition_matrix(sim["W"], d)
     frob = transition_matrix_distance(P_real, P_gen)
-    st.metric("Transition Matrix Frobenius Distance", f"{frob:.4f}")
+    st.metric("Transition matrix distance (Frobenius)", f"{frob:.4f}")
 
     def _transition_heatmap(prob, labels, title):
         text = [[f"{prob[i, j]:.2f}" for j in range(len(labels))] for i in range(len(labels))]
@@ -653,6 +643,7 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
             colorscale=[[0, "#fee8c8"], [0.5, "#f4a582"], [1, "#e76f51"]],
             showscale=True,
         )
+        fig.data[0].update(zmin=0, zmax=1)
         fig.update_layout(
             title=title, height=350,
             xaxis_title="To", yaxis_title="From",
@@ -667,14 +658,52 @@ def _render_comparison_body(data: AppData, real, sim, symbols):
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(fig_tm_real, width="stretch")
+        downloadable_chart(fig_tm_real, key="e_tm_real")
     with c2:
-        st.plotly_chart(fig_tm_sim, width="stretch")
+        downloadable_chart(fig_tm_sim, key="e_tm_sim")
+
+    # ── Contemporaneous Exceedance Matrix ─────────────────────────────
+    st.markdown(
+        r"**Contemporaneous exceedance matrix** $P_{ij}^{\text{co}} = \mathbb{P}(|X_t^j| > u_j \mid |X_t^i| > u_i)$, "
+        r"where $u_j$ is the 0.95 quantile of $|X^j|$ across extreme events and $X_t = R_t \cdot W_t$."
+    )
+    E_co_real = compute_exceedance_matrix(real["W"], real["R"], d, quantile=0.95, lagged=False)
+    E_co_gen = compute_exceedance_matrix(sim["W"], sim["R"], d, quantile=0.95, lagged=False)
+    frob_co = transition_matrix_distance(E_co_real, E_co_gen)
+    st.metric("Contemporaneous exceedance distance (Frobenius)", f"{frob_co:.4f}")
+
+    fig_co_real = _transition_heatmap(E_co_real, symbols, "Real — P(|Xⱼ|>u | |Xᵢ|>u) same t")
+    fig_co_gen = _transition_heatmap(E_co_gen, symbols, "Generated — P(|Xⱼ|>u | |Xᵢ|>u) same t")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        downloadable_chart(fig_co_real, key="e_co_real")
+    with c2:
+        downloadable_chart(fig_co_gen, key="e_co_sim")
+
+    # ── Lagged Exceedance Matrix ──────────────────────────────────────
+    st.markdown(
+        r"**Lagged exceedance matrix** $P_{ij}^{\text{lag}} = \mathbb{P}(|X_t^j| > u_j \mid |X_{t-1}^i| > u_i)$, "
+        r"where exceedances are computed over consecutive extreme events."
+    )
+    E_lag_real = compute_exceedance_matrix(real["W"], real["R"], d, quantile=0.95, lagged=True)
+    E_lag_gen = compute_exceedance_matrix(sim["W"], sim["R"], d, quantile=0.95, lagged=True)
+    frob_lag = transition_matrix_distance(E_lag_real, E_lag_gen)
+    st.metric("Lagged exceedance distance (Frobenius)", f"{frob_lag:.4f}")
+
+    fig_lag_real = _transition_heatmap(E_lag_real, symbols, "Real — P(|Xⱼ|>u at t | |Xᵢ|>u at t−1)")
+    fig_lag_gen = _transition_heatmap(E_lag_gen, symbols, "Generated — P(|Xⱼ|>u at t | |Xᵢ|>u at t−1)")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        downloadable_chart(fig_lag_real, key="e_lag_real")
+    with c2:
+        downloadable_chart(fig_lag_gen, key="e_lag_sim")
 
     # ── Dominant Asset Frequency ─────────────────────────────────────
     freq_real = compute_dominant_freq(real["W"], d)
     freq_gen = compute_dominant_freq(sim["W"], d)
     fig_dom = dominant_asset_bar_plot(freq_real, freq_gen, symbols)
 
-    st.plotly_chart(fig_dom, width="stretch")
+    downloadable_chart(fig_dom, key="e_dominant_freq")
 

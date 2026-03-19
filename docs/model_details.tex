@@ -1,0 +1,535 @@
+\documentclass[11pt,a4paper]{article}
+
+% ── Packages ──────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\hypersetup{colorlinks=true, linkcolor=blue!60!black, citecolor=blue!60!black, urlcolor=blue!60!black}
+
+% ── Notation ──────────────────────────────────────────────────────────
+\newcommand{\bW}{\boldsymbol{W}}
+\newcommand{\bmu}{\boldsymbol{\mu}}
+\newcommand{\bX}{\boldsymbol{X}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\ind}{\mathbf{1}}
+\DeclareMathOperator{\vMF}{vMF}
+\DeclareMathOperator{\Cat}{Cat}
+\DeclareMathOperator{\softmax}{softmax}
+\DeclareMathOperator{\softplus}{softplus}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\title{Cascading Extremes:\\Training, Loss Function, Transition Matrices,\\
+       and Generative Algorithm}
+\author{De~Carvalho, Ferrer \& Vallejos}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+%% =====================================================================
+\section{Notation}\label{sec:notation}
+%% =====================================================================
+
+Table~\ref{tab:notation} collects the symbols used throughout.
+
+\begin{table}[h]
+\centering
+\caption{Notation.}\label{tab:notation}
+\begin{tabular}{@{}cl@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} \\
+\midrule
+$d$          & Number of assets ($d=3$: BTC-USD, ETH-USD, BNB-USD) \\
+$\bX_t \in \R^d$  & Laplace-margin vector at time $t$ \\
+$R_t = \|\bX_t\|_2$  & Radial component (magnitude) \\
+$\bW_t = \bX_t / R_t \in \mathbb{S}^{d-1}$  & Angular component (direction on the unit sphere) \\
+$\Delta T_i$  & Inter-event time between events $i{-}1$ and $i$ \\
+$T_i$         & Absolute time of event $i$ \\
+$u_\tau(\bW)$ & Direction-dependent exceedance threshold at level $\tau$ \\
+$h_i$         & Transformer hidden state encoding history $\{(\bW_j, R_j, \Delta T_j)\}_{j \le i}$ \\
+$K$           & Number of vMF mixture components ($K=6$) \\
+$\lambda_i$   & Hawkes conditional intensity at event $i$ \\
+$\mu_i$       & Exogenous (baseline/immigration) intensity \\
+$\psi_i$      & Endogenous (self-excited) intensity \\
+$\text{POC}_i = \psi_i/\lambda_i$ & Probability of cascade (endogeneity index) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+An observation $\bX_t$ is an \emph{extreme event} if
+$R_t > u_\tau(\bW_t)$ with $\tau = 0.95$.
+All analysis and generation operates on the sequence of extreme events
+$\{(T_i, \bW_i, R_i, \Delta T_i)\}_{i=1}^N$.
+
+%% =====================================================================
+\section{Training \& Optimization}\label{sec:training}
+%% =====================================================================
+
+The \textbf{SphericalCascadeTransformer} is trained by minimising
+the negative joint log-likelihood (Section~\ref{sec:loss}),
+regularised by a subcriticality penalty.
+Table~\ref{tab:training} summarises the configuration.
+
+\begin{table}[h]
+\centering
+\caption{Training hyperparameters.}\label{tab:training}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Optimizer           & AdamW \cite{loshchilov2019decoupled}  \\
+Learning rate       & $10^{-4}$ (constant)                  \\
+Weight decay        & $5 \times 10^{-4}$                    \\
+Batch size          & 16                                    \\
+Sequence length     & 128 events                            \\
+Epochs              & 150                                   \\
+Gradient clipping   & max-norm $= 1.0$                      \\
+LR scheduler        & None                                  \\
+Checkpoint          & Best validation loss                  \\
+Train / Val / Test  & 70\% / 15\% / 15\% (temporal split)   \\
+Device              & CPU                                   \\
+Seed                & 42                                    \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Details.}
+\begin{itemize}[nosep]
+  \item No early stopping: the model trains for all 150 epochs and the
+        checkpoint with the lowest validation loss is retained.
+  \item Gradient norms are clipped at~1.0.  Batches producing
+        \texttt{NaN}/\texttt{Inf} losses are skipped.
+  \item The split is \emph{temporal} (first 70\% train, next 15\% val,
+        last 15\% test) to avoid look-ahead.
+\end{itemize}
+
+\paragraph{Transformer architecture.}
+The encoder has 4~causal Transformer layers with
+$d_{\text{model}} = 128$, 4~attention heads, feed-forward dim $= 512$,
+dropout $= 0.15$, and sinusoidal positional encoding
+(max length~1\,024).
+Each input token is a 14-dimensional vector
+\[
+  \text{token}_i
+  = \bigl[\,\bW_i,\;\; \xi(\bW_i),\;\; \log R_i,\;\; \log \Delta T_i\,\bigr],
+\]
+where $\xi(\bW) = [\bW^2,\, W^{(a)}W^{(b)}]_{a<b}$ are spherical
+features ($d + d + \binom{d}{2} = 9$ features for $d=3$, giving
+$9 + 3 + 1 + 1 = 14$ total).
+
+%% =====================================================================
+\section{Loss Function}\label{sec:loss}
+%% =====================================================================
+
+\begin{equation}\label{eq:loss}
+  \mathcal{L}
+  = -\frac{1}{N}\sum_{i=1}^{N}
+    \Bigl[
+      \underbrace{\log p(\bW_i \mid h_i)}_{\text{direction}}
+    + \underbrace{\log p(R_i \mid h_i)}_{\text{magnitude}}
+    + \underbrace{\log p(\Delta T_i \mid h_i)}_{\text{timing}}
+    \Bigr]
+  + \lambda_s \cdot \mathcal{P}_{\text{sub}}\,,
+\end{equation}
+with $\lambda_s = 0.1$.  The three component weights are all equal to 1.
+
+%% ------------------------------------------------------------------
+\subsection{Direction: Mixture of von Mises--Fisher}
+
+\begin{equation}\label{eq:vmf}
+  p(\bW \mid h)
+  = \sum_{k=1}^{K} \pi_k \;\cdot\; C_d(\kappa_k)\,
+    \exp\!\bigl(\kappa_k\,\bmu_k^\top \bW\bigr)\,,
+  \qquad K = 6\,,
+\end{equation}
+
+where:
+\begin{align}
+  \pi &= \softmax\!\bigl(\Pi(h)\bigr)
+       \in \Delta^{K-1}, \label{eq:pi} \\[2pt]
+  \bmu_k &= \frac{M_k(h)}{\|M_k(h)\|_2}
+       \in \mathbb{S}^{d-1}, \label{eq:mu} \\[2pt]
+  \kappa_k &= \softplus\!\bigl(\mathcal{K}_k(h)\bigr) > 0. \label{eq:kappa}
+\end{align}
+
+For $d = 3$ the normalising constant is
+$C_3(\kappa) = \kappa \,/\, (4\pi\sinh\kappa)$.
+
+%% ------------------------------------------------------------------
+\subsection{Magnitude: Truncated Gamma}
+
+\begin{equation}\label{eq:mag}
+  \log p(R \mid h)
+  = \underbrace{a\log\beta - \log\Gamma(a) + (a-1)\log R - \beta R}_{\log f_{\Gamma}(R;\,a,\,\beta)}
+  \;-\; \log\!\bigl[1 - F_\Gamma\!\bigl(u_\tau(\bW);\,a,\,\beta\bigr)\bigr],
+\end{equation}
+
+with rate $\beta = \softplus\!\bigl(g(h,\,\log R_{i-1},\,\bW_i)\bigr)$
+produced by a two-layer gauge network, and shape
+$a = \softplus(a_{\text{raw}}) + a_{\min}$.
+The direction-dependent threshold $u_\tau(\bW)$ is learned by a
+\texttt{SphericalQuantileMLP} (two hidden layers of 64 units)
+trained with pinball loss at $\tau = 0.95$.
+
+%% ------------------------------------------------------------------
+\subsection{Timing: Hawkes process with directional attenuation}
+
+\begin{equation}\label{eq:time}
+  \log p(\Delta T_i \mid h)
+  = \log \lambda_i - \lambda_i \,\Delta T_i\,,
+\end{equation}
+
+where
+
+\begin{equation}\label{eq:hawkes}
+  \lambda_i
+  = \underbrace{\mu_i}_{\text{exogenous}}
+  + \underbrace{\sum_{j < i}
+      A_{ij}\,
+      \exp\!\Bigl(-\frac{T_i - T_j}{\tau_{ij}}\Bigr)
+      \cdot \kappa(\bW_i, \bW_j)
+      \cdot \varphi(R_j)}_{\displaystyle\psi_i}\,.
+\end{equation}
+
+Each factor is a learned function of the Transformer hidden states:
+\begin{align}
+  \mu_i &= \softplus\!\bigl(\text{MLP}_\mu(h_i)\bigr), \label{eq:mu_base} \\
+  A_{ij} &= \softplus\!\bigl(\text{MLP}_A([h_i, h_j])\bigr), \label{eq:A} \\
+  \tau_{ij} &= \softplus\!\bigl(\text{MLP}_\tau([h_i, h_j])\bigr) + \tau_{\min},
+              \quad \tau_{\min} = 1\text{ hour}, \label{eq:tau} \\
+  \kappa(\bW_i, \bW_j) &= \sigma\!\bigl(\text{MLP}_\kappa([\bW_i, \bW_j])\bigr) \in (0,1],
+              \label{eq:attenuation} \\
+  \varphi(R_j) &= \softplus\!\bigl(\text{MLP}_\varphi(\log R_j)\bigr). \label{eq:phi}
+\end{align}
+
+The \textbf{POC} (probability of cascade) is $\text{POC}_i = \psi_i / \lambda_i$.
+
+%% ------------------------------------------------------------------
+\subsection{Subcriticality penalty}
+
+\begin{equation}\label{eq:subcrit}
+  \mathcal{P}_{\text{sub}}
+  = \Bigl[\max\!\Bigl(0,\;\; \max_{i}\sum_{j} K_{ij} - m\Bigr)\Bigr]^{2}\,,
+  \qquad m = 0.95\,,
+\end{equation}
+
+where $K_{ij}$ is the full excitation kernel
+$A_{ij}\exp(\cdot)\,\kappa(\cdot)\,\varphi(\cdot)$
+evaluated at training events.
+This keeps the spectral radius $\rho(K) < 1$,
+guaranteeing subcriticality.
+
+%% =====================================================================
+\section{Transition Probability Matrices}\label{sec:transition}
+%% =====================================================================
+
+The Streamlit dashboard reports \textbf{three} $d \times d$ matrices
+in the \emph{Statistics Comparison} tab of the \emph{Experimentation Lab} page,
+each computed identically for real and generated events.
+Their Frobenius distance
+$\|P^{\text{real}} - P^{\text{gen}}\|_F$ is shown alongside.
+
+%% ------------------------------------------------------------------
+\subsection{Dominant-asset transition matrix}
+
+Let $d_t = \argmax_j |W_t^{(j)}|$ be the dominant asset at event~$t$.
+
+\begin{equation}\label{eq:trans}
+  P_{ij}
+  = \Prob\!\bigl(d_{t+1} = j \;\big|\; d_t = i\bigr),
+\end{equation}
+
+estimated by counting consecutive pairs $(d_t, d_{t+1})$ of extreme events.
+
+%% ------------------------------------------------------------------
+\subsection{Contemporaneous exceedance matrix}
+
+Let $\bX_t = R_t \bW_t \in \R^d$ and, for each asset~$j$,
+\[
+  u_j = Q_{0.95}\!\bigl(\{|X_t^{(j)}|\}_{t=1}^N\bigr)
+\]
+be the $0.95$-quantile of $|X^{(j)}|$ computed \emph{within} the set of
+$N$~extreme events.  Define the exceedance indicator
+$E_t^{(j)} = \ind\!\bigl(|X_t^{(j)}| > u_j\bigr)$.
+
+\begin{equation}\label{eq:contemp}
+  P_{ij}^{\text{co}}
+  = \Prob\!\bigl(E_t^{(j)} = 1 \;\big|\; E_t^{(i)} = 1\bigr)
+  = \frac{\sum_{t} E_t^{(i)}\,E_t^{(j)}}{\sum_{t} E_t^{(i)}}\,.
+\end{equation}
+
+This captures the tendency of two assets to have \emph{simultaneous}
+component-wise extremes.
+By construction $P_{ii}^{\text{co}} = 1$.
+
+%% ------------------------------------------------------------------
+\subsection{Lagged exceedance matrix}
+
+\begin{equation}\label{eq:lagged}
+  P_{ij}^{\text{lag}}
+  = \Prob\!\bigl(E_t^{(j)} = 1 \;\big|\; E_{t-1}^{(i)} = 1\bigr)
+  = \frac{\sum_{t} E_{t-1}^{(i)}\,E_t^{(j)}}{\sum_{t} E_{t-1}^{(i)}}\,,
+\end{equation}
+
+where $t{-}1$ and $t$ denote \textbf{consecutive extreme events}
+(not calendar hours).
+This captures the tendency of an extreme in asset~$i$
+to be \emph{followed} by an extreme in asset~$j$.
+
+\paragraph{Threshold choice.}
+The $0.95$-quantile of each marginal $|X^{(j)}|$ is computed
+\emph{within} the extreme events.  Since the events themselves
+are already exceedances ($R > u_\tau(\bW)$ at $\tau = 0.95$), the
+component-wise threshold selects the top $\approx 5\%$ of extremes
+per asset, providing a meaningful measure of cross-asset tail dependence
+even among tail observations.
+
+%% =====================================================================
+\section{Generative Algorithm}\label{sec:algorithm}
+%% =====================================================================
+
+Generation is \emph{autoregressive}: the Transformer predicts the next
+event given the full history, then the event is appended and the process
+repeats.  The sampling distributions are the same families whose
+log-densities appear in the training loss, so training and generation
+are exactly consistent.
+
+\begin{algorithm}[H]
+\caption{Autoregressive cascade generation}\label{alg:generate}
+\begin{algorithmic}[1]
+
+\Require Seed direction $\bW_0 \in \mathbb{S}^{d-1}$,
+         seed magnitude $R_0 > 0$,
+         time horizon $H > 0$,
+         sampling temperature $\mathcal{T} \in [0.2,\,3.0]$
+\Require Trained Transformer $f_\theta$, quantile model $q_\tau$
+\Require \textit{Optional prompt}:
+         history $\{(\bW_j, R_j, T_j, \Delta T_j)\}_{j=1}^{n}$
+
+\Statex
+\State \textbf{Initialise history:}
+\If{prompt provided}
+  \State Append $(\bW_0, R_0)$ to prompt;
+         set $T_{\text{end}} \gets T_n + H$
+\Else
+  \State $\bW \gets [\bW_0]$,\; $R \gets [R_0]$,\;
+         $T \gets [0]$,\; $\Delta T \gets [1]$;\;
+         $T_{\text{end}} \gets H$
+\EndIf
+
+\Statex
+\While{$T_{\text{last}} < T_{\text{end}}$
+       \textbf{and} $|\text{events}| < 2000$}
+
+  \Statex
+  \State $h \gets f_\theta\!\bigl(\text{tokens}_{1:i}\bigr)$
+         \Comment{causal Transformer encoding}
+
+  \Statex \textit{--- Direction ---}
+  \State $(\pi,\;\{\bmu_k,\kappa_k\}_{k=1}^K) \gets \text{heads}(h)$
+  \State $\pi \gets \softmax(\log\pi\,/\,\mathcal{T})$;
+         \quad $\kappa_k \gets \kappa_k / \mathcal{T}$
+         \Comment{temperature scaling}
+  \State $k^* \sim \Cat(\pi)$
+  \State $\bW_{i+1} \sim \vMF(\bmu_{k^*},\,\kappa_{k^*})$
+         \Comment{Wood's (1994) rejection sampler}
+
+  \Statex \textit{--- Magnitude ---}
+  \State $\beta \gets \softplus\!\bigl(g(h,\,\log R_i,\,\bW_{i+1})\bigr)$
+  \State $a \gets \softplus(a_{\text{raw}}) + a_{\min}$
+  \State $u \gets q_\tau(\bW_{i+1})$
+         \Comment{direction-dependent threshold}
+  \State $p \sim \text{Uniform}(0,1)$
+  \State $R_{i+1} \gets F_\Gamma^{-1}\!\bigl(
+           F_\Gamma(u;\,a,\beta) + p\,[1 - F_\Gamma(u;\,a,\beta)]
+         ;\;a,\beta\bigr)$
+         \Comment{inverse-CDF truncation}
+
+  \Statex \textit{--- Timing ---}
+  \State $\lambda_i \gets \mu_i + \psi_i$
+         \Comment{Hawkes intensity, eq.~\eqref{eq:hawkes}}
+  \State $U \sim \text{Uniform}(0,1)$
+  \State $\Delta T_{i+1} \gets -\log U \,/\, \lambda_i$
+         \Comment{$\Delta T \sim \text{Exp}(\lambda_i)$}
+  \State $T_{i+1} \gets T_i + \Delta T_{i+1}$
+
+  \Statex
+  \State Append $(\bW_{i+1},\,R_{i+1},\,T_{i+1},\,\Delta T_{i+1})$
+\EndWhile
+
+\Statex
+\State \Return $\{\bW,\, R,\, T,\, \Delta T\}$
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Key properties.}
+
+\begin{enumerate}[nosep]
+  \item \textbf{Training--generation consistency.}
+        $\Delta T \sim \text{Exp}(\lambda)$ inverts the training objective
+        $\log\lambda - \lambda\,\Delta T$.
+        Directions and magnitudes are sampled from the same vMF mixture
+        and truncated Gamma whose log-densities define the loss.
+
+  \item \textbf{Temperature.}
+        $\mathcal{T} = 1$: faithful to the learned distribution.
+        $\mathcal{T} < 1$: sharpens mixture weights and concentrations
+        (more deterministic cascades).
+        $\mathcal{T} > 1$: more diverse.
+
+  \item \textbf{Variable-length output.}
+        Generation stops when $T > T_{\text{end}}$, not after a fixed
+        number of events.  A safety cap of $2\,000$ events prevents
+        runaway generation.
+
+  \item \textbf{Truncation guarantees exceedances.}
+        Every generated event satisfies $R_{i+1} > u_\tau(\bW_{i+1})$
+        by construction, via the inverse-CDF method (no rejection).
+
+  \item \textbf{Prompt conditioning.}
+        When a prompt history is provided, the Transformer conditions
+        on this context.  The output includes only the seed plus
+        generated continuation, with time re-based to zero.
+\end{enumerate}
+
+%% =====================================================================
+\section{Interactive Dashboard}\label{sec:dashboard}
+%% =====================================================================
+
+All diagnostics, visualisations, and generation experiments described
+above are implemented in a Streamlit application
+(\texttt{streamlit run streamlit\_test/app.py}).
+The dashboard has three data-source modes
+(real data with directional $u_\tau$, real data with global $u_\tau$,
+and simulated VAR data) selectable from the sidebar.
+It is organised into three pages.
+
+%% ------------------------------------------------------------------
+\subsection{Page 1: 3D Viewer}
+
+Displays the extreme events as a 3D scatter plot on and beyond
+the unit sphere $\mathbb{S}^2$.
+Each point is positioned at $R_t \bW_t$; since $R_t > u_\tau(\bW_t)$,
+most points lie \emph{outside} the unit sphere.
+A bulk cloud of all ${\sim}17\,500$ non-extreme observations
+can be toggled on.
+
+Below the sphere, four sub-tabs show:
+\begin{enumerate}[nosep]
+  \item \textbf{Intensity:} $\lambda(t)$ decomposed into $\mu(t)$ and $\psi(t)$.
+  \item \textbf{EI:} the endogeneity index $\text{POC}_t = \psi_t / \lambda_t$.
+  \item \textbf{Event Rail:} timeline coloured by dominant asset and
+        POC intensity.
+  \item \textbf{Returns:} per-asset component $R_t W_t^{(j)}$ over time.
+\end{enumerate}
+
+A playback slider controls how many events are displayed, and a sidebar
+slider sets the Transformer context window (up to 1\,024).
+
+%% ------------------------------------------------------------------
+\subsection{Page 2: Theory \& Genealogy}
+
+Computes the immigration-branching genealogy from the Hawkes
+decomposition and displays summary KPIs (event count, number of
+immigrants, cluster count, mean/max cluster size, endogeneity).
+
+Seven sub-tabs:
+\begin{enumerate}[nosep]
+  \item \textbf{Genealogy Tree:} directed forest of parent--child
+        links coloured by POC, plus the endogeneity index distribution.
+  \item \textbf{Cluster Explorer:} select a cluster (sorted by size)
+        and view its BFS chain on the sphere, with an event-level
+        table of $(T, R, \bW, \text{parent}, \text{EI})$.
+  \item \textbf{Subcriticality:} kernel row sums versus the margin $m = 0.95$,
+        spectral radius, and penalty value.
+  \item \textbf{Termination Bounds:} Galton--Watson survival probability
+        $\Prob(|C| \ge n) \le \nu^{n-1}$ compared against the empirical
+        cluster-size distribution.
+  \item \textbf{Coexistence:} number of simultaneously active cascades
+        over time.
+  \item \textbf{Parent Probs:} immigration probability
+        $\Prob(\text{immigrant})_i = \mu_i / \lambda_i$ per event,
+        and the full parent-probability heatmap.
+  \item \textbf{Kernel Analysis:} excitation matrix $K_{ij}$ heatmap
+        and learned attenuation $\kappa(\bW_i, \bW_j)$ heatmap.
+\end{enumerate}
+
+Three expandable sections at the bottom present the training
+configuration (Table~\ref{tab:training}), the loss function
+(Section~\ref{sec:loss}), and the generative algorithm
+(Algorithm~\ref{alg:generate}).
+
+%% ------------------------------------------------------------------
+\subsection{Page 3: Experimentation Lab}
+
+Two sub-tabs:
+
+\paragraph{Threshold Effect.}
+An interactive slider adjusts $\tau$ from 0.90 to 0.99.
+The 3D sphere redraws with only the events exceeding the
+rescaled threshold, and KPIs update (number and percentage
+of extremes, threshold distribution histogram).
+
+\paragraph{Statistics Comparison.}
+The main diagnostic page.
+The user either generates a \emph{fresh} cascade
+(autoregressive, conditioned on the full real history as prompt,
+with adjustable direction, magnitude, horizon, and temperature)
+or loads the stored simulation.
+The following real-vs-generated diagnostics are shown side-by-side:
+
+\begin{enumerate}[nosep]
+  \item Summary table: $n$, $\E[R]$, $\sigma(R)$,
+        $\min R$, $\max R$, $\E[\Delta T]$.
+  \item QQ-plots of $R$ and $\Delta T$.
+  \item C2ST (classifier two-sample test) with ROC curve and AUC.
+  \item Hawkes intensity decomposition: $\lambda(t)$, $\mu(t)$, $\psi(t)$.
+  \item EI time series and EI distribution overlay.
+  \item Genealogy trees.
+  \item Event rails coloured by dominant asset and POC.
+  \item Per-asset return tracks $R_t W_t^{(j)}$.
+  \item 3D sphere scatter.
+  \item Magnitude boxplots, radial histograms,
+        inter-event time histograms.
+  \item $\Delta T$ autocorrelation comparison.
+  \item Component-wise mean log-likelihood bar chart
+        ($\E[\log p_W]$, $\E[\log p_R]$, $\E[\log p_T]$).
+  \item Dominant-asset transition matrix $P_{ij}$ (eq.~\ref{eq:trans}).
+  \item Contemporaneous exceedance matrix $P_{ij}^{\text{co}}$
+        (eq.~\ref{eq:contemp}).
+  \item Lagged exceedance matrix $P_{ij}^{\text{lag}}$
+        (eq.~\ref{eq:lagged}).
+  \item Dominant-asset frequency bar chart.
+\end{enumerate}
+
+Each matrix is displayed as an annotated heatmap with the Frobenius
+distance $\|P^{\text{real}} - P^{\text{gen}}\|_F$ reported above.
+
+%% =====================================================================
+\begin{thebibliography}{9}
+
+\bibitem{loshchilov2019decoupled}
+I.~Loshchilov and F.~Hutter.
+\newblock Decoupled weight decay regularization.
+\newblock In \emph{ICLR}, 2019.
+
+\bibitem{wood1994}
+A.~T.~A.~Wood.
+\newblock Simulation of the von Mises--Fisher distribution.
+\newblock \emph{Comm.\ Statist.\ --- Simulation Comput.},
+  23(1):157--164, 1994.
+
+\end{thebibliography}
+
+\end{document}

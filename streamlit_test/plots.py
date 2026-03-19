@@ -61,6 +61,23 @@ def _apply_style(fig: go.Figure) -> go.Figure:
     return fig
 
 
+# ── Downloadable chart helper ────────────────────────────────────────────
+
+import streamlit as st  # noqa: E402
+
+
+def downloadable_chart(fig: go.Figure, *, key: str):
+    """Display a Plotly chart with a PNG download button underneath."""
+    st.plotly_chart(fig, use_container_width=True)
+    png_bytes = fig.to_image(format="png", width=1200, height=700, scale=3)
+    title = (fig.layout.title.text if fig.layout.title and fig.layout.title.text else key)
+    filename = title.lower().replace(" ", "_").replace(".", "") + ".png"
+    st.download_button(
+        f"Download {title}", data=png_bytes, file_name=filename,
+        mime="image/png", key=key,
+    )
+
+
 # ── 3D Geometry primitives ───────────────────────────────────────────────
 
 
@@ -758,6 +775,7 @@ def dominant_asset_bar_plot(
         barmode="group", height=300,
         title="Dominant asset frequency",
         xaxis_title="Asset", yaxis_title="Fraction",
+        yaxis_range=[0, 1],
     )
     return _apply_style(fig)
 
@@ -784,7 +802,7 @@ def c2st_roc_plot(
         height=350,
         xaxis_title="False Positive Rate",
         yaxis_title="True Positive Rate",
-        title="Classifier two-sample test (C2ST)",
+        title="Logistic classifier ROC — real vs generated",
         xaxis=dict(range=[0, 1]),
         yaxis=dict(range=[0, 1.05]),
     )
